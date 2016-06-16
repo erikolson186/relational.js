@@ -1,0 +1,33 @@
+{
+  "name": "relational.js",
+  "version": "1.0.0",
+  "description": "Implementation of the relational algebra",
+  "main": "relational.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "relational",
+    "algebra",
+    "database",
+    "rdbms",
+    "trdbms",
+    "truly-rdbms",
+    "logic",
+    "the third manifesto",
+    "ttm",
+    "tutorial d",
+    "d",
+    "a"
+  ],
+  "dependencies": {
+    "clone": "1.0.2",
+    "algebra.js": "0.2.5"
+  },
+  "author": "Erik Olson <erikolson186@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/erikolson186/algebra.js.git"
+  }
+}
