@@ -98,6 +98,25 @@ Which outputs:
 The predicate of person is true.
 ```
 
+### Defining Rules
+
+An instance of `Relation` supports the definition of rules. This functionality is similar to the rules of Datalog and Prolog. Where **r** is an instance of `Relation`, and **fn** is a function, the method invocation `r.rule(fn)` defines **fn** as a rule for **r**. The function **fn** must accept a single argument being an object with bound variables as enumerable properties. If the solution to the rule for any given supplied bound variables is an indefinite number of tuples then **fn** should return `Symbol(indefinite)`. If there is no solution it should return `undefined`, `null` or `false`. Otherwise it should return the solution as an iterable of tuples as objects. It is optional for the returned tuples as objects to include enumerable properties of the bound variables. If the tuples of the solution only contain the bound variables, then **fn** can optionally return `true`. 
+
+```javascript
+let positive = new Relation(['x']);
+positive.rule(({ x }) => x > 0);
+
+console.log(`It is ${positive.has({ x: -3 })} that -3 is positive.`);
+console.log(`It is ${positive.has({ x: 4 })} that 4 is positive.`);
+```
+
+Which outputs:
+
+```
+It is false that -3 is positive.
+It is true that 4 is positive.
+```
+
 ### Relational Operators
 
 #### Conjunction (and)
@@ -323,7 +342,7 @@ Nathan is an ancestor of John.
 
 ### Operators Defined as Relations
 
-As noted and discussed in Appendix A of TTM, operators can be treated as relations and invoked using relational conjunction with another relation that supplies arguments. The following are some operators defined as relations that relational.js provides. If an operator is not provided with sufficient arguments to resolve the free variables then the resulting `Relation` object has a size of `Symbol(indefinite)` and it's body is only resolved if the relational disjunction is applied to it and another `Relation` object with a body that includes the necessary arguments.  
+As noted and discussed in Appendix A of TTM, operators can be treated as relations and invoked using relational conjunction with another relation that supplies arguments. The following are some operators defined as relations that relational.js provides. If an operator is not provided with sufficient arguments to resolve the free variables then the resulting `Relation` object has a size of `Symbol(indefinite)`. The body of the relation is only resolved if the relational disjunction is applied to it and another `Relation` object with a body that includes the necessary arguments. In essence this is a relational form of the partial application of functions.
 
 #### Square Root (sqrt)
 

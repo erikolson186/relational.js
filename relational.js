@@ -42,6 +42,7 @@ const join = (R, S, attrs) => {
         for (let attr of attrs) { params[attr] = r_tuple[attr]; }
         
         const s_body = S._select(params);
+        
         if (s_body === INDEFINITE) { return s_body; }
 
         for (let s_tuple of s_body) {
@@ -188,7 +189,7 @@ class Relation {
         return body;
     }
 
-    _rule(fn) {
+    rule(fn) {
         this._size = INDEFINITE;
 
         const old_select = this._select.bind(this);
@@ -204,13 +205,26 @@ class Relation {
                 }
             }
 
+            const set_bound_vars = (body) => {
+                for (let tuple of body) {
+                    for (let param in new_params) {
+                        tuple[param] = new_params[param];
+                    }
+                }
+            };
+            
             const select_result = old_select(new_params);
             if (select_result === INDEFINITE) { return select_result; }
-
-            const fn_result = fn(new_params);
+            
+            set_bound_vars(select_result);
+         
+            let fn_result = fn(new_params);
             if (fn_result === INDEFINITE) { return fn_result; }
-
             if (!fn_result) { return select_result; }
+
+            fn_result = fn_result === true ? [{ }] : [...fn_result];
+
+            set_bound_vars(fn_result);
 
             return union({ _body: select_result }, { _body: fn_result });
         };
@@ -240,7 +254,7 @@ class Relation {
 
     and(S) {
         const R = this;
-
+        
         const common_vars = R._getCommonFreeVariables(S);
 
         const header = new Set(R._header);
@@ -282,7 +296,7 @@ class Relation {
                 const body = join(R, S, common_vars);
                 
                 if (body === INDEFINITE) {
-                    rel._rule((params) => {
+                    rel.rule((params) => {
                         const new_common_vars = new Set(common_vars);
                         
                         for (let attr of header) {
@@ -312,7 +326,7 @@ class Relation {
                     return join(new_r, new_s, common_vars);
                 };
 
-                rel._rule(rule);
+                rel.rule(rule);
 
                 return rel;
             }
@@ -329,7 +343,7 @@ class Relation {
                 rel._body = body;
                 rel._size = body.length;
             }
-        } else { rel._rule(rule); }
+        } else { rel.rule(rule); }
 
         return rel;
     }
@@ -345,7 +359,7 @@ class Relation {
         const rel = new Relation(header);
 
         if (!common_vars.length) {
-            rel._rule((params) => {
+            rel.rule((params) => {
                 if (Object.keys(params).length !== rel._degree) {
                     return INDEFINITE;
                 }
@@ -372,7 +386,7 @@ class Relation {
             if (body !== INDEFINITE) {
                 rel._body = body;
                 rel._size = body.length;
-            } else { rel._rule(rule); }
+            } else { rel.rule(rule); }
 
             return rel;
         }
@@ -383,7 +397,7 @@ class Relation {
             if (!common_vars.includes(attr)) { uncommon_vars.push(attr); }
         }
 
-        rel._rule((params) => {
+        rel.rule((params) => {
             const common_params = {};
             
             for (let attr of common_vars) {
@@ -418,7 +432,7 @@ class Relation {
 
         rel._not_rel = this;
 
-        rel._rule((params) => {
+        rel.rule((params) => {
             const params_length = Object.keys(params).length;
             if (this._degree !== params_length) { return INDEFINITE; }
 
@@ -464,7 +478,7 @@ class Relation {
         rel._body = fn(this._body);
 
         if (this._size === INDEFINITE) {
-            rel._rule((params) => {
+            rel.rule((params) => {
                 const new_params = clone(params);
 
                 if (params.hasOwnProperty(b)) {
@@ -506,7 +520,7 @@ class Relation {
         rel._body = fn(this._body);
 
         if (this._size === INDEFINITE) {
-            rel._rule((params) => {
+            rel.rule((params) => {
                 const body = this._select(params);
 
                 if (body === INDEFINITE) { 
@@ -581,7 +595,7 @@ const equation = (eq) => {
 
     const rel = new Relation(variables);
 
-    rel._rule((params) => {
+    rel.rule((params) => {
         const params_length = Object.keys(params).length;
 
         if (params_length < variables.length - 1) {
@@ -612,7 +626,7 @@ const equation = (eq) => {
             } catch (e) { }
         } else {
             for (let variable of variables) {
-                if (new_params[variable] === undefined) {
+                if (!new_params.hasOwnProperty(variable)) {
                     const unknown = variable;
 
                     try {
@@ -630,15 +644,17 @@ const equation = (eq) => {
 
 const sqrt = new Relation(['x', 'y']);
 
-sqrt._rule(({ x, y }) => {
-    if (x === undefined) { return [{ x: y * y, y }]; }
+sqrt.rule((tuple) => {
+    const { x, y } = tuple;
+
+    if (!tuple.hasOwnProperty('x')) { return [{ x: y * y }]; }
 
     if (x < 0) { return; }
 
     const y1 = Math.sqrt(x), y2 = -y1;
     if (y !== undefined && y !== y1 && y !== y2) { return; }
 
-    return [{ x, y: y1 }, { x, y: y2 }];
+    return [{ y: y1 }, { y: y2 }];
 });
 
 const plus = equation('x + y = z');
@@ -649,12 +665,13 @@ const divide = equation('x / y = z');
 const comparison = (op) => {
     const rel = new Relation(['x', 'y']);
 
-    rel._rule(({ x, y }) => {
-        if (x === undefined || y === undefined) {
+    rel.rule((tuple) => {
+        if (!tuple.hasOwnProperty('x') || 
+            !tuple.hasOwnProperty('y')) {
             return INDEFINITE;
         }
 
-        if (op(x, y)) { return [{ x, y }]; }
+        return op(tuple.x, tuple.y);
     });
 
     return rel;
