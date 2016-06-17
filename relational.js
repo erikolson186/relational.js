@@ -54,32 +54,32 @@ const join = (R, S, attrs) => {
 };
 
 class Relation {
-    constructor(header, body) {
-        if (!header) {
-            header = [];
+    constructor(heading, body) {
+        if (!heading) {
+            heading = [];
 
             if (body) {
                 const tuple = body.next ? body.next().value : body[0];
 
                 if (tuple) {
-                    for (let attr in tuple) { header.push(attr); }
+                    for (let attr in tuple) { heading.push(attr); }
                 }
             } else { body = []; }
         } else {
-            header = [...header];
+            heading = [...heading];
 
             if (!body) { body = []; }
         }
 
-        this._header = header;
-        this._degree = header.length;
+        this._heading = heading;
+        this._degree = heading.length;
         this._body = [];
         this._size = 0;
 
         for (let tuple of body) { this.add(tuple); }
     }
 
-    get header() { return new Set(this._header); }
+    get heading() { return new Set(this._heading); }
     get degree() { return this._degree; }
     get size() { return this._size; }
 
@@ -90,7 +90,7 @@ class Relation {
 
         const new_tuple = {};
 
-        for (let attr of this._header) {
+        for (let attr of this._heading) {
             if (!tuple.hasOwnProperty(attr)) {
                 throw Error(`tuple is missing attribute '${attr}'`);
             }
@@ -171,7 +171,7 @@ class Relation {
         const attrs = [];
 
         for (let attr in params) {
-            if (this._header.includes(attr)) { attrs.push(attr); }
+            if (this._heading.includes(attr)) { attrs.push(attr); }
         }
         
         const body = [];
@@ -199,7 +199,7 @@ class Relation {
 
             if (params) {
                 for (let param in params) {
-                    if (this._header.includes(param)) {
+                    if (this._heading.includes(param)) {
                         new_params[param] = params[param];
                     }
                 }
@@ -237,8 +237,8 @@ class Relation {
     _getCommonFreeVariables(S) {
         const common_vars = [];
 
-        for (let attr of this._header) {
-            if (S._header.includes(attr)) {
+        for (let attr of this._heading) {
+            if (S._heading.includes(attr)) {
                 common_vars.push(attr);
             }
         }
@@ -257,10 +257,10 @@ class Relation {
         
         const common_vars = R._getCommonFreeVariables(S);
 
-        const header = new Set(R._header);
-        for (let attr of S._header) { header.add(attr); }
+        const heading = new Set(R._heading);
+        for (let attr of S._heading) { heading.add(attr); }
 
-        const rel = new Relation(header);
+        const rel = new Relation(heading);
 
         if (!R._size || !S._size) { return rel; }
 
@@ -269,12 +269,12 @@ class Relation {
             let r_params_length = 0, s_params_length = 0;
 
             for (let param in params) {
-                if (R._header.includes(param)) {
+                if (R._heading.includes(param)) {
                     r_params[param] = params[param];
                     r_params_length++;
                 }
 
-                if (S._header.includes(param)) {
+                if (S._heading.includes(param)) {
                     s_params[param] = params[param];
                     s_params_length++;
                 }
@@ -299,7 +299,7 @@ class Relation {
                     rel.rule((params) => {
                         const new_common_vars = new Set(common_vars);
                         
-                        for (let attr of header) {
+                        for (let attr of heading) {
                             if (params.hasOwnProperty(attr)) {
                                 new_common_vars.add(attr);
                             }
@@ -320,7 +320,7 @@ class Relation {
                 if (S._size !== INDEFINITE) { return fn(S, R); }
 
                 var and = (new_r, new_s) => {
-                    new_s._header = S._header;
+                    new_s._heading = S._heading;
                     new_s._select = Relation.prototype._select.bind(new_s);
 
                     return join(new_r, new_s, common_vars);
@@ -353,10 +353,10 @@ class Relation {
 
         const common_vars = R._getCommonFreeVariables(S);
         
-        const header = new Set(R._header);
-        for (let attr of S._header) { header.add(attr); }
+        const heading = new Set(R._heading);
+        for (let attr of S._heading) { heading.add(attr); }
 
-        const rel = new Relation(header);
+        const rel = new Relation(heading);
 
         if (!common_vars.length) {
             rel.rule((params) => {
@@ -393,7 +393,7 @@ class Relation {
 
         const uncommon_vars = [];
 
-        for (let attr of header) {
+        for (let attr of heading) {
             if (!common_vars.includes(attr)) { uncommon_vars.push(attr); }
         }
 
@@ -428,7 +428,7 @@ class Relation {
     not() {
         if (this._not_rel) { return clone(this._not_rel); }
 
-        const rel = new Relation(this._header);
+        const rel = new Relation(this._heading);
 
         rel._not_rel = this;
 
@@ -443,20 +443,20 @@ class Relation {
     }
 
     rename(a, b) {
-        if (!this._header.includes(a)) {
-            throw Error(`attribute name '${a}' is not in header`);
+        if (!this._heading.includes(a)) {
+            throw Error(`attribute name '${a}' is not in heading`);
         }
 
-        if (this._header.includes(b)) {
-            throw Error(`attribute name '${b}' is already in header`);
+        if (this._heading.includes(b)) {
+            throw Error(`attribute name '${b}' is already in heading`);
         }
 
-        const header = new Set(this._header);
+        const heading = new Set(this._heading);
 
-        header.add(b);
-        header.delete(a);
+        heading.add(b);
+        heading.delete(a);
 
-        const rel = new Relation(header);
+        const rel = new Relation(heading);
 
         if (!this._size) { return rel; }
 
@@ -497,10 +497,10 @@ class Relation {
     }
 
     remove(a) {
-        const header = new Set(this._header);
-        header.delete(a);
+        const heading = new Set(this._heading);
+        heading.delete(a);
 
-        const rel = new Relation(header);
+        const rel = new Relation(heading);
 
         if (!rel._degree || !this._size) { return rel; }
 
@@ -543,8 +543,8 @@ class Relation {
 
         let rel = R.and(S);
 
-        for (let attr of S._header) {
-            if (R._header.includes(attr)) {
+        for (let attr of S._heading) {
+            if (R._heading.includes(attr)) {
                 rel = rel.remove(attr);
             }
         }
@@ -559,11 +559,11 @@ class Relation {
 
         this._assertDefiniteSize();
 
-        const rel = new Relation(this._header);
+        const rel = new Relation(this._heading);
 
         if (!this._size) { return rel; }
 
-        const [a, b] = [...this._header];
+        const [a, b] = [...this._heading];
 
         const fn = (body) => {
             const closures = [];

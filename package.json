@@ -1,6 +1,6 @@
 {
   "name": "relational.js",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Implementation of the relational algebra",
   "main": "relational.js",
   "scripts": {
@@ -14,6 +14,9 @@
     "trdbms",
     "truly-rdbms",
     "logic",
+    "datalog",
+    "prolog",
+    "logic programming",
     "the third manifesto",
     "ttm",
     "tutorial d",
