@@ -550,7 +550,11 @@ class Relation {
 
         const rel = new Relation(heading);
 
-        if (!rel._degree || !this.size) { return rel; }
+        if (!rel._degree) {
+            if (this.size) { rel._body = [{ }]; }
+
+            return rel;
+        }
 
         const fn = (body) => {
             const new_body = [];
