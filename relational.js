@@ -54,34 +54,62 @@ const join = (R, S, attrs) => {
 };
 
 class Relation {
-    constructor(heading, body) {
-        if (!heading) {
-            heading = [];
+    constructor(heading, body, rule_fn) {
+        this._indefinite = false;
+        this._body = [];
 
-            if (body) {
-                const tuple = body.next ? body.next().value : body[0];
+        if (rule_fn) { this._rule(rule_fn); }
 
-                if (tuple) {
-                    for (let attr in tuple) { heading.push(attr); }
+        if (heading) {
+            this._heading = heading;
+            this._degree = Object.keys(heading).length;
+
+            for (let attr in heading) {
+                const type = heading[attr];
+
+                if (type === undefined || type === null) {
+                    throw Error(`heading attribute '${attr}' type is ${type}`);
                 }
-            } else { body = []; }
-        } else {
-            heading = [...heading];
+            }
 
-            if (!body) { body = []; }
+            if (!body) { return; }
+        } else {
+            this._heading = {};
+            this._degree = 0;
+
+            if (!body) { return; }
+
+            const tuple = body.shift();
+
+            if (tuple) {
+                for (let attr in tuple) {
+                    const type = tuple[attr]; 
+
+                    if (type === undefined || type === null) {
+                        throw Error(`attribute '${attr}' type is ${type}`);
+                    }
+
+                    this._heading[attr] = type.constructor;
+                    this._degree++;
+                }
+
+                if (!this._degree) { return; }
+
+                this._body.push(tuple);
+            }
         }
 
-        this._heading = heading;
-        this._degree = heading.length;
-        this._body = [];
-        this._size = 0;
-
-        for (let tuple of body) { this.add(tuple); }
+        if (this._degree) {
+            for (let tuple of body) { this.add(tuple); }
+        }
     }
 
-    get heading() { return new Set(this._heading); }
+    get heading() { return clone(this._heading); }
     get degree() { return this._degree; }
-    get size() { return this._size; }
+    
+    get size() {
+        return this._indefinite ? INDEFINITE : this._body.length;
+    }
 
     [Symbol.iterator]() { return this.values(); }
 
@@ -90,21 +118,27 @@ class Relation {
 
         const new_tuple = {};
 
-        for (let attr of this._heading) {
+        for (let attr in this._heading) {
             if (!tuple.hasOwnProperty(attr)) {
                 throw Error(`tuple is missing attribute '${attr}'`);
+            }
+
+            const attr_type = tuple[attr];
+
+            if (attr_type === undefined || attr_type === null) {
+                throw Error(`attribute '${attr}' is ${attr_type}`);
+            }
+
+            if (attr_type.constructor !== this._heading[attr]) {
+                const type = this._heading[attr].name;
+
+                throw Error(`attribute '${attr}' must be of type ${type}`);
             }
 
             new_tuple[attr] = tuple[attr];
         }
 
-        if (!this.has(tuple)) {
-            this._body.push(tuple);
-
-            if (this._size !== INDEFINITE) {
-                this._size = this._body.length;
-            }
-        }
+        if (!this.has(tuple)) { this._body.push(tuple); }
 
         return this;
     }
@@ -152,7 +186,7 @@ class Relation {
     has(tuple) {
         const body = this._select(tuple);
 
-        if (body === INDEFINITE || body[0]) { return true; }
+        if (body._indefinite || body[0]) { return true; }
 
         return false;
     }
@@ -171,7 +205,7 @@ class Relation {
         const attrs = [];
 
         for (let attr in params) {
-            if (this._heading.includes(attr)) { attrs.push(attr); }
+            if (this._heading[attr]) { attrs.push(attr); }
         }
         
         const body = [];
@@ -189,8 +223,8 @@ class Relation {
         return body;
     }
 
-    rule(fn) {
-        this._size = INDEFINITE;
+    _rule(fn) { 
+        this._indefinite = true;
 
         const old_select = this._select.bind(this);
 
@@ -199,7 +233,7 @@ class Relation {
 
             if (params) {
                 for (let param in params) {
-                    if (this._heading.includes(param)) {
+                    if (this._heading[param]) {
                         new_params[param] = params[param];
                     }
                 }
@@ -212,17 +246,17 @@ class Relation {
                     }
                 }
             };
-            
+
             const select_result = old_select(new_params);
             if (select_result === INDEFINITE) { return select_result; }
-            
+
             set_bound_vars(select_result);
-         
+
             let fn_result = fn(new_params);
             if (fn_result === INDEFINITE) { return fn_result; }
             if (!fn_result) { return select_result; }
 
-            fn_result = fn_result === true ? [{ }] : [...fn_result];
+            fn_result = fn_result === true ? [{}] : [...fn_result];
 
             set_bound_vars(fn_result);
 
@@ -231,14 +265,18 @@ class Relation {
     }
 
     toBoolean() {
-        return this._size === INDEFINITE || this._size > 0;
+        return this._indefinite || this._body.length > 0;
     }
 
     _getCommonFreeVariables(S) {
         const common_vars = [];
 
-        for (let attr of this._heading) {
-            if (S._heading.includes(attr)) {
+        for (let attr in this._heading) {
+            if (S._heading[attr]) {
+                if (this._heading[attr] !== S._heading[attr]) {
+                    throw Error(`type mismatch for attribute '${attr}'`);
+                }
+
                 common_vars.push(attr);
             }
         }
@@ -247,7 +285,7 @@ class Relation {
     }
 
     _assertDefiniteSize() {
-        if (this._size === INDEFINITE) {
+        if (this._indefinite) {
             throw Error('relation must have a definite cardinality');
         }
     }
@@ -257,24 +295,23 @@ class Relation {
         
         const common_vars = R._getCommonFreeVariables(S);
 
-        const heading = new Set(R._heading);
-        for (let attr of S._heading) { heading.add(attr); }
+        const heading = Object.assign({}, R._heading, S._heading);
 
         const rel = new Relation(heading);
-
-        if (!R._size || !S._size) { return rel; }
-
+        
+        if (!R.size || !S.size) { return rel; }
+        
         const rule = (params) => {
             const r_params = {}, s_params = {};
             let r_params_length = 0, s_params_length = 0;
 
             for (let param in params) {
-                if (R._heading.includes(param)) {
+                if (R._heading[param]) {
                     r_params[param] = params[param];
                     r_params_length++;
                 }
 
-                if (S._heading.includes(param)) {
+                if (S._heading[param]) {
                     s_params[param] = params[param];
                     s_params_length++;
                 }
@@ -294,12 +331,12 @@ class Relation {
         if (common_vars.length) {            
             const fn = (R, S) => {
                 const body = join(R, S, common_vars);
-                
+
                 if (body === INDEFINITE) {
-                    rel.rule((params) => {
+                    rel._rule((params) => {
                         const new_common_vars = new Set(common_vars);
                         
-                        for (let attr of heading) {
+                        for (let attr in heading) {
                             if (params.hasOwnProperty(attr)) {
                                 new_common_vars.add(attr);
                             }
@@ -308,16 +345,13 @@ class Relation {
                         const new_r = { _body: times(R, { _body: [params] }) };
                         return join(new_r, S, new_common_vars);
                     });
-                } else {
-                    rel._body = body;
-                    rel._size = body.length;
-                }
+                } else { rel._body = body; }
 
                 return rel;
             };
 
-            if (R._size === INDEFINITE) {
-                if (S._size !== INDEFINITE) { return fn(S, R); }
+            if (R._indefinite) {
+                if (!S._indefinite) { return fn(S, R); }
 
                 var and = (new_r, new_s) => {
                     new_s._heading = S._heading;
@@ -326,7 +360,7 @@ class Relation {
                     return join(new_r, new_s, common_vars);
                 };
 
-                rel.rule(rule);
+                rel._rule(rule);
 
                 return rel;
             }
@@ -339,11 +373,8 @@ class Relation {
         const body = rule();
 
         if (body !== INDEFINITE) {
-            if (body) {
-                rel._body = body;
-                rel._size = body.length;
-            }
-        } else { rel.rule(rule); }
+            if (body) { rel._body = body; }
+        } else { rel._rule(rule); }
 
         return rel;
     }
@@ -353,13 +384,12 @@ class Relation {
 
         const common_vars = R._getCommonFreeVariables(S);
         
-        const heading = new Set(R._heading);
-        for (let attr of S._heading) { heading.add(attr); }
+        const heading = Object.assign({}, R._heading, S._heading);
 
         const rel = new Relation(heading);
 
         if (!common_vars.length) {
-            rel.rule((params) => {
+            rel._rule((params) => {
                 if (Object.keys(params).length !== rel._degree) {
                     return INDEFINITE;
                 }
@@ -383,21 +413,19 @@ class Relation {
 
             const body = rule();
 
-            if (body !== INDEFINITE) {
-                rel._body = body;
-                rel._size = body.length;
-            } else { rel.rule(rule); }
+            if (body !== INDEFINITE) { rel._body = body; } 
+            else { rel._rule(rule); }
 
             return rel;
         }
 
         const uncommon_vars = [];
 
-        for (let attr of heading) {
+        for (let attr in heading) {
             if (!common_vars.includes(attr)) { uncommon_vars.push(attr); }
         }
 
-        rel.rule((params) => {
+        rel._rule((params) => {
             const common_params = {};
             
             for (let attr of common_vars) {
@@ -432,7 +460,7 @@ class Relation {
 
         rel._not_rel = this;
 
-        rel.rule((params) => {
+        rel._rule((params) => {
             const params_length = Object.keys(params).length;
             if (this._degree !== params_length) { return INDEFINITE; }
 
@@ -442,23 +470,27 @@ class Relation {
         return rel;
     }
 
-    rename(a, b) {
-        if (!this._heading.includes(a)) {
-            throw Error(`attribute name '${a}' is not in heading`);
+    rename(obj) {
+        const heading = clone(this._heading);
+
+        for (let attr in obj) {
+            const a = attr, b = obj[attr];
+
+            if (!this._heading[a]) {
+                throw Error(`attribute name '${a}' is not in heading`);
+            }
+
+            if (this._heading[b]) {
+                throw Error(`attribute name '${b}' is already in heading`);
+            }
+
+            heading[b] = heading[a];
+            delete heading[a];
         }
-
-        if (this._heading.includes(b)) {
-            throw Error(`attribute name '${b}' is already in heading`);
-        }
-
-        const heading = new Set(this._heading);
-
-        heading.add(b);
-        heading.delete(a);
 
         const rel = new Relation(heading);
 
-        if (!this._size) { return rel; }
+        if (!this.size) { return rel; }
 
         const fn = (body) => {
             const new_body = [];
@@ -466,8 +498,12 @@ class Relation {
             for (let tuple of body) {
                 const new_tuple = clone(tuple);
 
-                new_tuple[b] = tuple[a];
-                delete new_tuple[a];
+                for (let attr in obj) {
+                    const a = attr, b = obj[attr];
+
+                    new_tuple[b] = tuple[a];
+                    delete new_tuple[a];
+                }
 
                 new_body.push(new_tuple);
             }
@@ -477,13 +513,17 @@ class Relation {
 
         rel._body = fn(this._body);
 
-        if (this._size === INDEFINITE) {
-            rel.rule((params) => {
+        if (this._indefinite) {
+            rel._rule((params) => {
                 const new_params = clone(params);
 
-                if (params.hasOwnProperty(b)) {
-                    new_params[a] = params[b];
-                    delete new_params[b];
+                for (let attr in obj) {
+                    const a = attr, b = obj[attr];
+
+                    if (params.hasOwnProperty(b)) {
+                        new_params[a] = params[b];
+                        delete new_params[b];
+                    }
                 }
 
                 const body = this._select(new_params);
@@ -491,25 +531,33 @@ class Relation {
 
                 return fn(body);
             });
-        } else { rel._size = rel._body.length; }
+        }
 
         return rel;
     }
 
-    remove(a) {
-        const heading = new Set(this._heading);
-        heading.delete(a);
+    remove(attrs) {
+        if (!attrs.length) { return clone(this); }
+
+        for (let attr of attrs) {
+            if (!this._heading[attr]) {
+                throw Error(`attribute ${attr} is not in heading`);
+            }
+        }
+
+        const heading = clone(this._heading);
+        for (let attr of attrs) { delete heading[attr]; }
 
         const rel = new Relation(heading);
 
-        if (!rel._degree || !this._size) { return rel; }
+        if (!rel._degree || !this.size) { return rel; }
 
         const fn = (body) => {
             const new_body = [];
 
             for (let tuple of body) {
                 const new_tuple = clone(tuple);
-                delete new_tuple[a];
+                for (let attr of attrs) { delete new_tuple[attr]; }
 
                 new_body.push(new_tuple);
             }
@@ -519,37 +567,33 @@ class Relation {
 
         rel._body = fn(this._body);
 
-        if (this._size === INDEFINITE) {
-            rel.rule((params) => {
+        if (this._indefinite) {
+            rel._rule((params) => {
                 const body = this._select(params);
 
-                if (body === INDEFINITE) { 
+                if (body === INDEFINITE) {
                     if (Object.keys(params).length === rel._degree) {
                         return [params];
                     }
 
-                    return body; 
+                    return body;
                 }
 
                 return fn(body);
             });
-        } else { rel._size = rel._body.length; }
+        }
 
         return rel;
     }
 
     compose(S) {
-        const R = this;
+        const R = this, remove_attrs = [];
 
-        let rel = R.and(S);
+        for (let attr in S._heading) {
+            if (R._heading[attr]) { remove_attrs.push(attr); }
+        } 
 
-        for (let attr of S._heading) {
-            if (R._heading.includes(attr)) {
-                rel = rel.remove(attr);
-            }
-        }
-
-        return rel;
+        return R.and(S).remove(remove_attrs);
     }
 
     tclose() {
@@ -561,9 +605,9 @@ class Relation {
 
         const rel = new Relation(this._heading);
 
-        if (!this._size) { return rel; }
+        if (!this.size) { return rel; }
 
-        const [a, b] = [...this._heading];
+        const [a, b] = Object.keys(this._heading);
 
         const fn = (body) => {
             const closures = [];
@@ -584,18 +628,30 @@ class Relation {
         };
 
         rel._body = fn(this._body);
-        rel._size = rel._body.length;
 
         return rel;
+    }
+
+    project(attrs) {
+        const remove_attrs = [];
+
+        for (let attr in this._heading) {
+            if (!attrs.includes(attr)) { remove_attrs.push(attr); }
+        }
+
+        return this.remove(remove_attrs);
     }
 }
 
 const equation = (eq) => {
     const variables = eq.split(/\W+/);
 
-    const rel = new Relation(variables);
+    const header = {};
+    for (let variable of variables) { header[variable] = Number; }
 
-    rel.rule((params) => {
+    const rel = new Relation(header);
+
+    rel._rule((params) => {
         const params_length = Object.keys(params).length;
 
         if (params_length < variables.length - 1) {
@@ -642,17 +698,17 @@ const equation = (eq) => {
     return rel;
 };
 
-const sqrt = new Relation(['x', 'y']);
+const sqrt = new Relation({ x: Number, y: Number });
 
-sqrt.rule((tuple) => {
+sqrt._rule((tuple) => {
     const { x, y } = tuple;
-
-    if (!tuple.hasOwnProperty('x')) { return [{ x: y * y }]; }
-
+    
+    if (x === undefined) { return [{ x: y * y }]; }
+    
     if (x < 0) { return; }
 
     const y1 = Math.sqrt(x), y2 = -y1;
-    if (y !== undefined && y !== y1 && y !== y2) { return; }
+    if (y && y !== y1 && y !== y2) { return; }
 
     return [{ y: y1 }, { y: y2 }];
 });
@@ -663,9 +719,9 @@ const multiply = equation('x * y = z');
 const divide = equation('x / y = z');
 
 const comparison = (op) => {
-    const rel = new Relation(['x', 'y']);
+    const rel = new Relation({ x: Number, y: Number });
 
-    rel.rule((tuple) => {
+    rel._rule((tuple) => {
         if (!tuple.hasOwnProperty('x') || 
             !tuple.hasOwnProperty('y')) {
             return INDEFINITE;

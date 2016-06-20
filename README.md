@@ -1,14 +1,16 @@
 ![relational.js](https://cldup.com/_0Mg316Cxd.png)
 
-**relational.js** is an implementation of the relational algebra named **A**, as defined in [Appendix A](http://www.dcs.warwick.ac.uk/~hugh/TTM/APPXA.pdf) of *Databases, Types and the Relational Model: The Third Manifesto (TTM)*, for [node](https://nodejs.org/en/).
+**relational.js** is a logic programming package based on the relational model that implements the definitional algebra **A** as defined in [Appendix A](http://www.dcs.warwick.ac.uk/~hugh/TTM/APPXA.pdf) of *Databases, Types and the Relational Model: The Third Manifesto (TTM)*.
 
-This implementation supports the full range of relational operators of **A** for computing the conjunction, disjunction, negation, renaming of attributes, removing of attributes, composition and transitive closures of relations. Thus relations with an indefinite cardinality (an unknown or possibly infinite number of tuples) are definable and queryable. In addition, a database of operators defined as relations is provided which includes relations for square roots, addition, subtraction, multiplication, etc.
+**relational.js** conforms to a subset of the *RM Prescriptions* and *RM Proscriptions* defined in *TTM* for a relational language **D**. **relational.js** offers an approach to the relational model distinct from the proposals of Darwen and Date in *TTM* in that it supports resolution theorem proving based on Horn clauses for computing relations with definite cardinalities as results of queries of relations with indefinite cardinalities.
 
-The functionality of relational.js is derived from the logic programming paradigm along side Datalog and Prolog, and does not reflect the intent of the generic language **D** or definitional language **A** as defined in *TTM*. However this implementation does conform to several of the *RM Prescriptions* and *RM Proscriptions* defined in *TTM*.
+This implementation supports the full range of relational operators of **A** for computing the conjunction, disjunction, negation, renaming of attributes, removing of attributes, composition and transitive closures of relations. Thus relations with an indefinite cardinality are definable and queryable. In addition, a database of operators defined as relations is provided which includes relations for square roots, addition, subtraction, multiplication, etc.
 
-This module is written in ECMAScript 6 and presents an interface for defining and using relations that provides a superset of the properties and methods of an instance of the built-in [Set](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set) constructor.
+This package is written in ECMAScript 6 and presents an interface for defining and using relations that provides a superset of the properties and methods of an instance of the built-in [Set](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set) constructor.
 
 ## Installation
+
+To install **relational.js** for usage with [node](https://nodejs.org/):
 
 ```
 $ npm install relational.js
@@ -23,23 +25,41 @@ let { Relation } = Relational;
 
 ### Defining Relations
 
-Relations are defined using the `Relation(heading[, body])` constructor where **heading** is an iterable of attribute names and **body** is an iterable of objects with enumerable properties that include those in the heading. Due to JavaScript not being strongly typed, the heading of a relation defined using relational.js does not include types as required by *TTM*.
+Relations are defined using the `Relation(heading, body[, rule_fn])` constructor where **heading** is an object with enumerable properties being attribute names with the values being type constructors, and **body** is an iterable of tuples as objects that conform to the heading. If **heading** is missing, but **body** isn't, then the heading is inferred using **body**, otherwise the relation will have a degree of zero. 
+
+The **rule_fn** argument is optional and acts as a rule defined for the relation. Rules are used for defining theorems as a series of goals that when queried an attempt is made to resolve tuples by proving the theorem true by finding values of attributes that satisfy the rules. If a value for **rule_fn** is supplied it must be a function that accepts a single argument being an object with bound variable identifiers as enumerable properties that includes the corresponding values. The function acts as a Horn clause similar to the rules of Datalog and Prolog. If the solution to the rule for any given supplied bound variables is an indefinite number of tuples then **rule_fn** should return `Symbol(indefinite)`. If there is no solution it should return `undefined`, `null` or `false`. Otherwise it should return the solution as an iterable of tuples as objects. It is optional for the returned tuples as objects to include enumerable properties of the bound variables. If the tuples of the solution only contain the bound variables, then **rule_fn** can optionally return `true`. When a rule is provided, the `Relation` object has a `size` attribute of value `Symbol(indefinite)`.
 
 ```javascript
-let r = new Relation(['x']);
-let p = new Relation(['d'], [{ d: 4 }]);
-let s = new Relation(null, [{ k: 8 }]);
-let g = new Relation();
+let r = new Relation();
+let s = new Relation({ x: Number });
+let p = new Relation({ d: Number }, [{ d: 4 }]);
+let g = new Relation(null, [{ k: 8 }]);
+```
+
+An example of using rules to define a relation with a heading that includes the single attribute **x** of type `Number`, and a body of an infinite number of tuples (which are not computed) where the value of **x** is a positive number.
+
+```javascript
+let positive = new Relation({ x: Number }, null, ({ x }) => x >= 0);
+
+console.log(`It is ${positive.has({ x: -3 })} that -3 is positive.`);
+console.log(`It is ${positive.has({ x: 4 })} that 4 is positive.`);
+```
+
+Which outputs:
+
+```
+It is false that -3 is positive.
+It is true that 4 is positive.
 ```
 
 An object instantiated using the `Relation` constructor has the following accessor properties: `heading` which returns the heading object, `degree` which returns the number of attributes of the heading, and `size` which returns the cardinality of the body as a number or `Symbol(indefinite)`.
 
 ### Inserting into Relations
 
-Where **r** is an instance of `Relation`, and **tuple** is an object with enumerable properties that include those in the heading of **r**, the method invocation `r.add(tuple)` inserts **tuple** into the body of **r** if it is not already in it and returns **r**.
+Where **r** is an instance of `Relation`, and **tuple** is an object with enumerable properties and value types that include those in the heading of **r**, the method invocation `r.add(tuple)` inserts **tuple** into the body of **r** if it is not already in it and returns **r**.
 
 ```javascript
-let r = new Relation(['x', 'k']);
+let r = new Relation({ x: Number, k: Number });
 
 r.add({ x: 4, k: 8 });
 ```
@@ -62,16 +82,16 @@ Instances of `Relation` are iterable and can be iterated over when the relation 
 let s = new Relation(null, [{ k: 4 }, { k: 8 }, { k: 6 }]);
 
 for (let { k } of s) {
-    console.log(`The value of k is ${k}.`);
+    console.log(`s: The value of k is ${k}.`);
 }
 ```
 
 Which outputs:
 
 ```
-The value of k is 4.
-The value of k is 8.
-The value of k is 6.
+s: The value of k is 4.
+s: The value of k is 8.
+s: The value of k is 6.
 ```
 
 Also defined for iteration are the methods `entries`, `forEach`, `keys`, and `values`, with the same usage as with an instance of the built-in [Set](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Set) constructor.
@@ -82,12 +102,12 @@ The predicate of a relation is true if the cardinality of the relation is greate
 
 ```javascript
 // predicate: Person with a name and an age.
-let heading = ['name', 'age'];
+let heading = { name: String, age: Number };
 
 // fact: Person named Jack whose age is 30.
 let tuple = { name: 'Jack', age: 30 };
 
-let person = new Relation(null, [tuple]);
+let person = new Relation(heading, [tuple]);
 
 console.log(`The predicate of person is ${person.toBoolean()}.`);
 ```
@@ -98,30 +118,11 @@ Which outputs:
 The predicate of person is true.
 ```
 
-### Defining Rules
-
-An instance of `Relation` supports the definition of rules. This functionality is similar to the rules of Datalog and Prolog. Where **r** is an instance of `Relation`, and **fn** is a function, the method invocation `r.rule(fn)` defines **fn** as a rule for **r**. The function **fn** must accept a single argument being an object with bound variables as enumerable properties. If the solution to the rule for any given supplied bound variables is an indefinite number of tuples then **fn** should return `Symbol(indefinite)`. If there is no solution it should return `undefined`, `null` or `false`. Otherwise it should return the solution as an iterable of tuples as objects. It is optional for the returned tuples as objects to include enumerable properties of the bound variables. If the tuples of the solution only contain the bound variables, then **fn** can optionally return `true`. 
-
-```javascript
-let positive = new Relation(['x']);
-positive.rule(({ x }) => x > 0);
-
-console.log(`It is ${positive.has({ x: -3 })} that -3 is positive.`);
-console.log(`It is ${positive.has({ x: 4 })} that 4 is positive.`);
-```
-
-Which outputs:
-
-```
-It is false that -3 is positive.
-It is true that 4 is positive.
-```
-
 ### Relational Operators
 
 #### Conjunction (and)
 
-Where **r1** and **r2** are both instances of `Relation`, and **s** is the result of `r1.and(r2)`. The value of **s** is an instance of `Relation` with the heading being the union of the headings of **r1** and **r2**. If the cardinalities of both **r1** and **r2** are indefinite, or the cardinality of **r1** or **r2** is indefinite and no tuples of the indefinite body could be resolved using the definite body, then the size attribute of **s** is `Symbol(indefinite)`. The body of the relation represented by **s** is a possibly infinite number of every tuple that conforms to the heading of **s** and is a superset of both some tuple in the body of the relation represented by **r1** and some tuple in the body of the relation represented by **r2**.
+Where **r1** and **r2** are both instances of `Relation` with the types of any common attributes of the headings being equal, and **s** is the result of `r1.and(r2)`. The value of **s** is an instance of `Relation` with the heading being the union of the headings of **r1** and **r2**. If the cardinalities of both **r1** and **r2** are indefinite, or the cardinality of **r1** or **r2** is indefinite and no tuples of the indefinite body could be resolved using the definite body, then the size attribute of **s** is `Symbol(indefinite)`. The body of the relation represented by **s** is a possibly infinite number of every tuple that conforms to the heading of **s** and is a superset of both some tuple in the body of the relation represented by **r1** and some tuple in the body of the relation represented by **r2**.
 
 If the predicates of **r1** and **r2** contain common free variables, then the body of the relation represented by **s** is the *natural join* of the bodies of the relations represented by **r1** and **r2**, otherwise it is the *Cartesian product* of the two relations.
 
@@ -157,6 +158,7 @@ An instance of the `Set` constructor includes the `has` method. An instance of `
 
 ```javascript
 let person = new Relation(null, [{ name: 'Jack' }, { name: 'Tom' }]);
+
 let b = person.has({ name: 'Tom' });
 
 console.log(`It is ${b} that there is a person named Tom.`);
@@ -170,30 +172,30 @@ It is true that there is a person named Tom.
 
 #### Disjunction (or)
 
-Where **r1** and **r2** are both instances of `Relation`, and **s** is the result of `r1.or(r2)`. The value of **s** is an instance of `Relation` with the heading being the union of the headings of **r1** and **r2**. If the cardinality of either **r1** or **r2** is indefinite then the size attribute of **s** is `Symbol(indefinite)`. The body of the relation represented by **s** is a possibly infinite number of every tuple that conforms to the heading of **s** and is a superset of both some tuple in the body of the relation represented by **r1** or some tuple in the body of the relation represented by **r2**.
+Where **r1** and **r2** are both instances of `Relation` with the types of any common attributes of the headings being equal, and **s** is the result of `r1.or(r2)`. The value of **s** is an instance of `Relation` with the heading being the union of the headings of **r1** and **r2**. If the cardinality of either **r1** or **r2** is indefinite then the size attribute of **s** is `Symbol(indefinite)`. The body of the relation represented by **s** is a possibly infinite number of every tuple that conforms to the heading of **s** and is a superset of both some tuple in the body of the relation represented by **r1** or some tuple in the body of the relation represented by **r2**.
 
 If the predicates of **r1** and **r2** contain common free variables, then the body of the relation represented by **s** is the *union* of the bodies of the relations represented by **r1** and **r2**. Otherwise the body is an infinite number of tuples where the values of attributes not common to **r1** and **r2** are any possible value whether or not it is in the bodies of the relations represented by **r1** or **r2**.
 
 ```javascript
-// predicate: Truck with a model name and a year.
-let truck = new Relation(null, [{ model: 'Ford F-150', year: 2016 }]);
+// predicate: Truck with a make, model and year.
+let truck = new Relation(null, [{ make: 'Ford', model: 'F-150', year: 2016 }]);
 
-// predicate: Car with a model name and a year.
-let car = new Relation(null, [{ model: 'Ford Mustang', year: 2015 }]);
+// predicate: Car with a make, model and year.
+let car = new Relation(null, [{ make: 'Ford', model: 'Mustang', year: 2015 }]);
 
 // predicate: Vehicle that is either a truck or a car.
 let vehicle = truck.or(car);
 
-for (let { model, year } of vehicle) {
-    console.log(`model ${model} year ${year} is a vehicle.`);
+for (let { make, model, year } of vehicle) {
+    console.log(`Make ${make} model ${model} year ${year} is a vehicle.`);
 }
 ```
 
 Which outputs:
 
 ```
-Model Ford F-150 year 2016 is a vehicle.
-Model Ford Mustang year 2015 is a vehicle.
+Make Ford model F-150 year 2016 is a vehicle.
+Make Ford model Mustang year 2015 is a vehicle.
 ```
 
 #### Negation (not)
@@ -236,29 +238,29 @@ There exists a civilian named Thomas.
 
 #### Renaming Attributes (rename)
 
-Where **r** is an instance of `Relation`, **a** and **b** are both attribute names where **a** is in the heading of **r** and **b** is not, and **s** is the result of `r.rename(a, b)`. The value of **s** is an instance of `Relation` with the heading being the heading of **r** with the attribute name **a** renamed to **b**. If the cardinality of **r** is indefinite then the size attribute of **s** is `Symbol(indefinite)`. The body of the relation represented by **s** is a possibly infinite number of every tuple in the body of the relation represented by **r** except that the attribute name **a** is replaced with **b**.
+Where **r** is an instance of `Relation`, and **obj** is an object with enumerable properties being attribute names in the heading of **r** to be renamed, with the values being attribute names not in the heading of **r** to be renamed to, and **s** is the result of `r.rename(obj)`. The value of **s** is an instance of `Relation` with the heading being the heading of **r** with the attribute names renamed in accordance to **obj**. If the cardinality of **r** is indefinite then the size attribute of **s** is `Symbol(indefinite)`. The body of the relation represented by **s** is a possibly infinite number of every tuple in the body of the relation represented by **r** except that the attribute names are renamed in accordance to **obj**.
 
 ```javascript
 // predicate: "r" with "g" and "k" values.
 let r = new Relation(null, [{ g: 4, k: 8 }, { g: 6, k: 2 }]);
 
-let s = r.rename('g', 'b');
+let s = r.rename({ g: 'b' });
 
 for (let { b, k } of s) {
-    console.log(`The value of b is ${b} and k is ${k}.`);
+    console.log(`s: The value of b is ${b} and k is ${k}.`);
 }
 ```
 
 Which outputs:
 
 ```
-The value of b is 4 and k is 8.
-The value of b is 6 and k is 2.
+s: The value of b is 4 and k is 8.
+s: The value of b is 6 and k is 2.
 ```
 
 #### Removing Attributes (remove)
 
-Where **r** is an instance of `Relation`, **a** is an attribute name in the heading of **r**, and **s** is the result of `r.remove(a)`. The value of **s** is an instance of `Relation` with the heading being the heading of **r** minus the attribute **a**. If the cardinality of **r** is indefinite then the size attribute of **s** is `Symbol(indefinite)`. The body of the relation represented by **s** is a possibly infinite number of every tuple that conforms to the heading of **s** and is a subset of some tuple in the body of the relation represented by **r**.
+Where **r** is an instance of `Relation`, **attrs** is an iterable of attribute names, and **s** is the result of `r.remove(attrs)`. The value of **s** is an instance of `Relation` with the heading being the heading of **r** minus the attributes in **attrs**. If the cardinality of **r** is indefinite then the size attribute of **s** is `Symbol(indefinite)`. The body of the relation represented by **s** is a possibly infinite number of every tuple that conforms to the heading of **s** and is a subset of some tuple in the body of the relation represented by **r**.
 
 ```javascript
 // predicate: "r" with "d" and "t" values.
@@ -267,18 +269,32 @@ let r = new Relation(null, [{ d: 3, t: 2 }, { d: 8, t: 3 }]);
 // predicate: "s" with "d" and "t" values.
 let s = new Relation(null, [{ d: 3, t: 8 }, { d: 8, t: 6 }]);
 
-let p = r.remove('t').and(s);
+let p = r.remove(['t']);
+
+console.log(`p: The degree is ${p.degree}.`);
 
 for (let { d, t } of p) {
-    console.log(`The value of d is ${d} and t is ${t}.`);
+    console.log(`p: The value of d is ${d} and t is ${t}.`);
+}
+
+let g = p.and(s);
+
+console.log(`g: The degree is ${g.degree}.`);
+
+for (let { d, t } of g) {
+    console.log(`g: The value of d is ${d} and t is ${t}.`);
 }
 ```
 
 Which outputs:
 
 ```
-The value of d is 3 and t is 8.
-The value of d is 8 and t is 6.
+p: The degree is 1.
+p: The value of d is 3 and t is undefined.
+p: The value of d is 8 and t is undefined.
+g: The degree is 2.
+g: The value of d is 3 and t is 8.
+g: The value of d is 8 and t is 6.
 ```
 
 #### Composition (compose)
@@ -295,13 +311,13 @@ let r = new Relation(null, [{ x: 2 }]);
 // predicate: "s" with a "y" value in "f".
 let s = f.compose(r);
 
-console.log(`The value of y is ${[...s][0].y}.`);
+console.log(`s: The value of y is ${[...s][0].y}.`);
 ```
 
 Which outputs:
 
 ```
-The value of y is 8.
+s: The value of y is 8.
 ```
 
 #### Transitive Closure (tclose)
@@ -340,9 +356,32 @@ Nathan is an ancestor of David.
 Nathan is an ancestor of John.
 ```
 
+#### Projection (project)
+
+Where **r** is an instance of `Relation`, **attrs** is an iterable of attribute names, and **s** is the result of `r.tclose()`. The value of **s** is an instance of `Relation` with the same heading as that of **r** minus any attributes not found in **attrs**. The body of the relation represented by **s** is a possibly infinite number of every tuple that conforms to the heading of **s** and is either a subset of or equal to some tuple in the body of the relation represented by **r**.
+
+```javascript
+let r = new Relation(null, [{ x: 4, k: 8 }, { x: 6, k: 3 }]);
+let s = r.project(['x']);
+
+console.log(`s: The degree is ${s.degree}.`);
+
+for (let { x, k } of s) {
+    console.log(`s: The value of x is ${x} and k is ${k}.`);
+}
+```
+
+Which outputs:
+
+```
+s: The degree is 1.
+s: The value of x is 4 and k is undefined.
+s: The value of x is 6 and k is undefined.
+```
+
 ### Operators Defined as Relations
 
-As noted and discussed in Appendix A of TTM, operators can be treated as relations and invoked using relational conjunction with another relation that supplies arguments. The following are some operators defined as relations that relational.js provides. If an operator is not provided with sufficient arguments to resolve the free variables then the resulting `Relation` object has a size of `Symbol(indefinite)`. The body of the relation is only resolved if the relational disjunction is applied to it and another `Relation` object with a body that includes the necessary arguments. In essence this is a relational form of the partial application of functions.
+As noted and discussed in Appendix A of *TTM*, operators can be treated as relations and invoked using relational conjunction with another relation that supplies arguments. The following are some operators defined as relations that relational.js provides. If an operator is not provided with sufficient arguments to resolve the free variables then the resulting `Relation` object has a size of `Symbol(indefinite)`. The body of the relation is only resolved if the relational disjunction is applied to it and another `Relation` object with a body that includes the necessary arguments. In essence this is a relational form of the partial application of functions.
 
 #### Square Root (sqrt)
 
