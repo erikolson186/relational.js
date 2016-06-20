@@ -94,8 +94,8 @@ class Relation {
                 }
 
                 if (!this._degree) { return; }
-
-                this._body.push(tuple);
+                
+                if (!this.has(tuple)) { this._body.push(tuple); }
             }
         }
 
