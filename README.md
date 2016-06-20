@@ -25,7 +25,7 @@ let { Relation } = Relational;
 
 ### Defining Relations
 
-Relations are defined using the `Relation(heading, body[, rule_fn])` constructor where **heading** is an object with enumerable properties being attribute names with the values being type constructors, and **body** is an iterable of tuples as objects that conform to the heading. If **heading** is missing, but **body** isn't, then the heading is inferred using the first element of **body**, otherwise the relation will have a degree of zero. 
+Relations are defined using the `Relation(heading, body[, rule_fn])` constructor where **heading** is an object with enumerable properties being attribute names with the values being type constructors, and **body** is an iterable of tuples as objects that conform to the heading to be inserted. If **heading** is missing, but **body** isn't, then the heading is inferred using the first element of **body**, otherwise the relation will have a degree of zero. 
 
 The **rule_fn** argument is optional and acts as a rule defined for the relation. Rules are used for defining theorems as a series of goals that when queried an attempt is made to resolve tuples by proving the theorem true by finding values of attributes that satisfy the rules. If a value for **rule_fn** is supplied it must be a function that accepts a single argument being an object with bound variable identifiers as enumerable properties that includes the corresponding values. The function acts as a Horn clause similar to the rules of Datalog and Prolog. If the solution to the rule for any given supplied bound variables is an indefinite number of tuples then **rule_fn** should return `Symbol(indefinite)`. If there is no solution it should return `undefined`, `null` or `false`. Otherwise it should return the solution as an iterable of tuples as objects. It is optional for the returned tuples as objects to include enumerable properties of the bound variables. If the tuples of the solution only contain the bound variables, then **rule_fn** can optionally return `true`. When a rule is provided, the `Relation` object has a `size` attribute of value `Symbol(indefinite)`.
 
@@ -54,14 +54,36 @@ It is true that 4 is positive.
 
 An object instantiated using the `Relation` constructor has the following accessor properties: `heading` which returns the heading object, `degree` which returns the number of attributes of the heading, and `size` which returns the cardinality of the body as a number or `Symbol(indefinite)`.
 
+### Defining Relation Types
+
+Relation types can be defined by defining a class that extends `Relation`.
+
+```javascript
+// Define a relation type for Employee
+class Employee extends Relation {
+    constructor(...args) {
+        super({ name: String, position: String }, ...args);
+    }
+}
+```
+
 ### Inserting into Relations
 
 Where **r** is an instance of `Relation`, and **tuple** is an object with enumerable properties and value types that include those in the heading of **r**, the method invocation `r.add(tuple)` inserts **tuple** into the body of **r** if it is not already in it and returns **r**.
 
 ```javascript
-let r = new Relation({ x: Number, k: Number });
+class Person extends Relation {
+    constructor(...args) {
+        super({ name: String, age: Number }, ...args);
+    }
+}
 
-r.add({ x: 4, k: 8 });
+let r = new Relation({ x: Number, p: Person });
+
+r.add({ x: 4, p: new Person([{ name: 'Thomas', age: 59 }]) });
+
+// Throws Error: attribute 'p' must be of type Person
+r.add({ x: 4, p: new Relation() });
 ```
 
 ### Deleting from Relations

@@ -539,7 +539,9 @@ class Relation {
     }
 
     remove(attrs) {
-        if (!attrs.length) { return clone(this); }
+        attrs = new Set(attrs);
+
+        if (!attrs.size) { return clone(this); }
 
         for (let attr of attrs) {
             if (!this._heading[attr]) {
@@ -639,10 +641,12 @@ class Relation {
     }
 
     project(attrs) {
+        attrs = new Set(attrs);
+
         const remove_attrs = [];
 
         for (let attr in this._heading) {
-            if (!attrs.includes(attr)) { remove_attrs.push(attr); }
+            if (!attrs.has(attr)) { remove_attrs.push(attr); }
         }
 
         return this.remove(remove_attrs);
@@ -652,10 +656,10 @@ class Relation {
 const equation = (eq) => {
     const variables = eq.split(/\W+/);
 
-    const header = {};
-    for (let variable of variables) { header[variable] = Number; }
+    const heading = {};
+    for (let variable of variables) { heading[variable] = Number; }
 
-    const rel = new Relation(header);
+    const rel = new Relation(heading);
 
     rel._rule((params) => {
         const params_length = Object.keys(params).length;
@@ -706,9 +710,7 @@ const equation = (eq) => {
 
 const sqrt = new Relation({ x: Number, y: Number });
 
-sqrt._rule((tuple) => {
-    const { x, y } = tuple;
-    
+sqrt._rule(({ x, y }) => {    
     if (x === undefined) { return [{ x: y * y }]; }
     
     if (x < 0) { return; }
