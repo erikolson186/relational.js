@@ -36,11 +36,11 @@ const times = (R, S) => {
 
 const join = (R, S, attrs) => {
     const body = [];
-
+    
     for (let r_tuple of R._body) {
         const params = {};
         for (let attr of attrs) { params[attr] = r_tuple[attr]; }
-        
+            
         const s_body = S._select(params);
         
         if (s_body === INDEFINITE) { return s_body; }
@@ -115,7 +115,7 @@ class Relation {
 
     add(tuple) {
         if (!this._degree) { return this; }
-
+        
         const new_tuple = {};
 
         for (let attr in this._heading) {
@@ -138,7 +138,7 @@ class Relation {
             new_tuple[attr] = tuple[attr];
         }
 
-        if (!this.has(tuple)) { this._body.push(tuple); }
+        if (!this.has(new_tuple)) { this._body.push(new_tuple); }
 
         return this;
     }
@@ -214,7 +214,9 @@ class Relation {
 
         this._body.forEach((tuple) => {
             for (let attr of attrs) {
-                if (tuple[attr] !== params[attr]) { return; }
+                try {
+                    assert.deepEqual(tuple[attr], params[attr]);
+                } catch (e) { return; }
             }
 
             body.push(clone(tuple));
@@ -328,10 +330,10 @@ class Relation {
             return and({ _body: new_r_body }, { _body: new_s_body });
         };
 
-        if (common_vars.length) {            
+        if (common_vars.length) {
             const fn = (R, S) => {
                 const body = join(R, S, common_vars);
-
+                
                 if (body === INDEFINITE) {
                     rel._rule((params) => {
                         const new_common_vars = new Set(common_vars);
