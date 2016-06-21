@@ -1,6 +1,6 @@
 {
   "name": "relational.js",
-  "version": "1.0.8",
+  "version": "1.0.9",
   "description": "Implementation of the relational algebra",
   "main": "relational.js",
   "scripts": {

@@ -1,8 +1,8 @@
 ![relational.js](https://cldup.com/_0Mg316Cxd.png)
 
-**relational.js** is a logic programming package based on the relational model that implements the definitional algebra **A** as defined in [Appendix A](http://www.dcs.warwick.ac.uk/~hugh/TTM/APPXA.pdf) of *Databases, Types and the Relational Model: The Third Manifesto (TTM)*.
+**relational.js** is an experimental logic-programming package based on the relational model that implements the definitional algebra **A** as defined in [Appendix A](http://www.dcs.warwick.ac.uk/~hugh/TTM/APPXA.pdf) of *Databases, Types and the Relational Model: The Third Manifesto (TTM)*.
 
-**relational.js** conforms to a subset of the *RM Prescriptions* and *RM Proscriptions* defined in *TTM* for a relational language **D**. An approach to a relational query interface is offered distinct from the proposals of Darwen and Date in *TTM* in that a Horn-clause theorem-proving system is provided for computing relations with definite cardinalities as results of queries of relations with indefinite cardinalities.
+**relational.js** conforms to a subset of the *RM Prescriptions* and *RM Proscriptions* defined in *TTM* for a relational language **D**. An approach is offered distinct from the proposals of Darwen and Date in *TTM* in that a Horn-clause theorem-proving system is provided for computing relations with definite cardinalities as results of queries of relations with indefinite cardinalities.
 
 This implementation supports the full range of relational operators of **A** for computing the conjunction, disjunction, negation, renaming of attributes, removing of attributes, composition and transitive closures of relations. Thus relations with an indefinite cardinality are definable and queryable. In addition, a database of operators defined as relations is provided which includes relations for square roots, addition, subtraction, multiplication, etc.
 
