@@ -144,16 +144,26 @@ class Relation {
     }
 
     delete(tuple) {
-        this._assertDefiniteSize();
+        if (this._body.length) {
+            for (let i = 0; i < this._body.length; i++) {
+                try {
+                    assert.deepEqual(tuple, this._body[i]);
 
-        for (let i = 0; i < this._body.length; i++) {
-            try {
-                assert.deepEqual(tuple, this._body[i]);
+                    this._body.splice(i, 1);
 
-                this._body.splice(i, 1);
+                    return true;
+                } catch (e) { }
+            }
+        }
 
-                return true;
-            } catch (e) { }
+        if (this._indefinite) {
+            this._rule((params) => {
+                try {
+                    assert.deepEqual(tuple, params);
+
+                    return false;
+                } catch (e) { }
+            });
         }
 
         return false;
@@ -300,6 +310,7 @@ class Relation {
         const heading = Object.assign({}, R._heading, S._heading);
 
         const rel = new Relation(heading);
+        rel._compose_common_vars = common_vars;
         
         if (!R.size || !S.size) { return rel; }
         
@@ -541,14 +552,6 @@ class Relation {
     remove(attrs) {
         attrs = new Set(attrs);
 
-        if (!attrs.size) { return clone(this); }
-
-        for (let attr of attrs) {
-            if (!this._heading[attr]) {
-                throw Error(`attribute ${attr} is not in heading`);
-            }
-        }
-
         const heading = clone(this._heading);
         for (let attr of attrs) { delete heading[attr]; }
 
@@ -595,13 +598,13 @@ class Relation {
     }
 
     compose(S) {
-        const R = this, remove_attrs = [];
+        const R = this, anded_rel = R.and(S);
 
-        for (let attr in S._heading) {
-            if (R._heading[attr]) { remove_attrs.push(attr); }
-        } 
+        if (anded_rel._compose_common_vars.length) {
+            return anded_rel.remove(anded_rel._compose_common_vars);
+        }
 
-        return R.and(S).remove(remove_attrs);
+        return anded_rel;
     }
 
     tclose() {
@@ -648,6 +651,8 @@ class Relation {
         for (let attr in this._heading) {
             if (!attrs.has(attr)) { remove_attrs.push(attr); }
         }
+
+        if (!remove_attrs.length) { return clone(this); }
 
         return this.remove(remove_attrs);
     }
@@ -729,13 +734,13 @@ const divide = equation('x / y = z');
 const comparison = (op) => {
     const rel = new Relation({ x: Number, y: Number });
 
-    rel._rule((tuple) => {
-        if (!tuple.hasOwnProperty('x') || 
-            !tuple.hasOwnProperty('y')) {
+    rel._rule((params) => {
+        if (!params.hasOwnProperty('x') || 
+            !params.hasOwnProperty('y')) {
             return INDEFINITE;
         }
 
-        return op(tuple.x, tuple.y);
+        return op(params.x, params.y);
     });
 
     return rel;

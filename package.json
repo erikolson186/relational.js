@@ -1,10 +1,10 @@
 {
   "name": "relational.js",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "Implementation of the relational algebra",
   "main": "relational.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "./node_modules/.bin/mocha --reporter spec"
   },
   "keywords": [
     "relational",
@@ -24,8 +24,10 @@
     "a"
   ],
   "dependencies": {
-    "clone": "1.0.2",
-    "algebra.js": "0.2.5"
+    "algebra.js": "^0.2.5",
+    "chai": "^3.5.0",
+    "clone": "^1.0.2",
+    "mocha": "^2.5.3"
   },
   "author": "Erik Olson <erikolson186@gmail.com>",
   "license": "MIT",

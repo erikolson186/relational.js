@@ -124,14 +124,11 @@ The predicate of a relation is true if the cardinality of the relation is greate
 
 ```javascript
 // predicate: Person with a name and an age.
-let heading = { name: String, age: Number };
+let person = new Relation(null, [{ name: 'Jack', age: 30 }]);
 
-// fact: Person named Jack whose age is 30.
-let tuple = { name: 'Jack', age: 30 };
+let b = person.toBoolean();
 
-let person = new Relation(heading, [tuple]);
-
-console.log(`The predicate of person is ${person.toBoolean()}.`);
+console.log(`The predicate of person is ${b}.`);
 ```
 
 Which outputs:
