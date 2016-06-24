@@ -88,7 +88,7 @@ r.add({ x: 4, p: new Relation() });
 
 ### Deleting from Relations
 
-Where **r** is an instance of `Relation` representing a relation with a definite cardinality, and **tuple** is any object, the method invocation `R.delete(tuple)` removes **tuple** from the body of **r** if it is in it and returns `true`, otherwise it returns `false`.
+Where **r** is an instance of `Relation` representing a relation with a definite cardinality, and **tuple** is any object, the method invocation `R.delete(tuple)` removes **tuple** from the body of **r** if it is in it and ignores it when returned from a rule defined for **r**, and returns `true`, otherwise it returns `false`. 
 
 ```javascript
 let r = new Relation(null, [{ d: 3.0 }, { d: 4.8 }]);

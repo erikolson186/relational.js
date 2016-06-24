@@ -302,18 +302,15 @@ class Relation {
         }
     }
 
-    and(S) {
+    _and(S, common_vars) {
         const R = this;
-        
-        const common_vars = R._getCommonFreeVariables(S);
 
         const heading = Object.assign({}, R._heading, S._heading);
 
         const rel = new Relation(heading);
-        rel._compose_common_vars = common_vars;
-        
+
         if (!R.size || !S.size) { return rel; }
-        
+
         const rule = (params) => {
             const r_params = {}, s_params = {};
             let r_params_length = 0, s_params_length = 0;
@@ -333,7 +330,7 @@ class Relation {
             const new_r_body = R._select(r_params_length ? r_params : null);
             if (new_r_body === INDEFINITE) { return new_r_body; }
             if (!new_r_body.length) { return; }
-            
+
             const new_s_body = S._select(s_params_length ? s_params : null);
             if (new_s_body === INDEFINITE) { return new_s_body; }
             if (!new_s_body.length) { return; }
@@ -344,11 +341,11 @@ class Relation {
         if (common_vars.length) {
             const fn = (R, S) => {
                 const body = join(R, S, common_vars);
-                
+
                 if (body === INDEFINITE) {
                     rel._rule((params) => {
                         const new_common_vars = new Set(common_vars);
-                        
+
                         for (let attr in heading) {
                             if (params.hasOwnProperty(attr)) {
                                 new_common_vars.add(attr);
@@ -390,6 +387,10 @@ class Relation {
         } else { rel._rule(rule); }
 
         return rel;
+    }
+
+    and(S) {
+        return this._and(S, this._getCommonFreeVariables(S));
     }
 
     or(S) {
@@ -598,11 +599,11 @@ class Relation {
     }
 
     compose(S) {
-        const R = this, anded_rel = R.and(S);
+        const R = this, common_vars = R._getCommonFreeVariables(S);
 
-        if (anded_rel._compose_common_vars.length) {
-            return anded_rel.remove(anded_rel._compose_common_vars);
-        }
+        const anded_rel = R._and(S, common_vars);
+
+        if (common_vars.length) { return anded_rel.remove(common_vars); }
 
         return anded_rel;
     }
