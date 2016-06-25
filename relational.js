@@ -4,53 +4,52 @@ const algebra = require('algebra.js');
 
 const INDEFINITE = Symbol.for('indefinite');
 
-const union = (R, S) => {
-    const body = [];
+const union = (r, s) => {
+    const results = [];
 
-    for (let tuple of R._body) { body.push(tuple); }
+    for (let tuple of r) { results.push(tuple); }
 
-    for (let s_tuple of S._body) {
+    for (let s_tuple of s) {
         try {
-            for (let tuple of body) {
+            for (let tuple of results) {
                 assert.notDeepEqual(s_tuple, tuple);
             }
 
-            body.push(s_tuple);
+            results.push(s_tuple);
         } catch (e) { }
     }
 
-    return body;
+    return results;
 };
 
-const times = (R, S) => {
-    const body = [];
+const times = (r, s) => {
+    const results = [];
 
-    for (let r_tuple of R._body) {
-        for (let s_tuple of S._body) {
-            body.push(Object.assign(clone(r_tuple), clone(s_tuple)));
+    for (let r_tuple of r) {
+        for (let s_tuple of s) {
+            results.push(Object.assign(clone(r_tuple), clone(s_tuple)));
         }
     }
 
-    return body;
+    return results;
 };
 
-const join = (R, S, attrs) => {
-    const body = [];
-    
-    for (let r_tuple of R._body) {
+const join = (r, s, attrs) => {
+    const results = [];
+
+    for (let r_tuple of r) {
         const params = {};
         for (let attr of attrs) { params[attr] = r_tuple[attr]; }
-            
-        const s_body = S._select(params);
-        
-        if (s_body === INDEFINITE) { return s_body; }
 
-        for (let s_tuple of s_body) {
-            body.push(Object.assign(clone(r_tuple), clone(s_tuple)));
+        const s_results = s._select(params);
+        if (s_results === INDEFINITE) { return s_results; }
+
+        for (let s_tuple of s_results) {
+            results.push(Object.assign(clone(r_tuple), clone(s_tuple)));
         }
     }
 
-    return body;
+    return results;
 };
 
 class Relation {
@@ -144,19 +143,11 @@ class Relation {
     }
 
     delete(tuple) {
-        if (this._body.length) {
-            for (let i = 0; i < this._body.length; i++) {
-                try {
-                    assert.deepEqual(tuple, this._body[i]);
+        let found_it = false;
 
-                    this._body.splice(i, 1);
-
-                    return true;
-                } catch (e) { }
-            }
-        }
-
-        if (this._indefinite) {
+        if (this._indefinite && this._rule_fn(tuple)) {
+            found_it = true;
+            
             this._rule((params) => {
                 try {
                     assert.deepEqual(tuple, params);
@@ -166,7 +157,21 @@ class Relation {
             });
         }
 
-        return false;
+        if (this._body.length) {
+            for (let i = 0; i < this._body.length; i++) {
+                try {
+                    assert.deepEqual(tuple, this._body[i]);
+
+                    found_it = true;
+
+                    this._body.splice(i, 1);
+
+                    break;
+                } catch (e) { }
+            }
+        }
+
+        return found_it;
     }
 
     entries() {
@@ -237,6 +242,7 @@ class Relation {
 
     _rule(fn) { 
         this._indefinite = true;
+        this._rule_fn = fn;
 
         const old_select = this._select.bind(this);
 
@@ -251,28 +257,22 @@ class Relation {
                 }
             }
 
-            const set_bound_vars = (body) => {
-                for (let tuple of body) {
-                    for (let param in new_params) {
-                        tuple[param] = new_params[param];
-                    }
+            const select_results = old_select(new_params);
+            if (select_results === INDEFINITE) { return select_results; }
+
+            let fn_results = fn(new_params);
+            if (fn_results === INDEFINITE) { return fn_results; }
+            if (!fn_results) { return select_results; }
+
+            fn_results = fn_results === true ? [{}] : [...fn_results];
+
+            for (let tuple of fn_results) {
+                for (let param in new_params) {
+                    tuple[param] = new_params[param];
                 }
-            };
+            }
 
-            const select_result = old_select(new_params);
-            if (select_result === INDEFINITE) { return select_result; }
-
-            set_bound_vars(select_result);
-
-            let fn_result = fn(new_params);
-            if (fn_result === INDEFINITE) { return fn_result; }
-            if (!fn_result) { return select_result; }
-
-            fn_result = fn_result === true ? [{}] : [...fn_result];
-
-            set_bound_vars(fn_result);
-
-            return union({ _body: select_result }, { _body: fn_result });
+            return union(select_results, fn_results);
         };
     }
 
@@ -280,12 +280,12 @@ class Relation {
         return this._indefinite || this._body.length > 0;
     }
 
-    _getCommonFreeVariables(S) {
+    _getCommonFreeVariables(s) {
         const common_vars = [];
 
         for (let attr in this._heading) {
-            if (S._heading[attr]) {
-                if (this._heading[attr] !== S._heading[attr]) {
+            if (s._heading[attr]) {
+                if (this._heading[attr] !== s._heading[attr]) {
                     throw Error(`type mismatch for attribute '${attr}'`);
                 }
 
@@ -302,47 +302,57 @@ class Relation {
         }
     }
 
-    _and(S, common_vars) {
-        const R = this;
+    _and(s, common_vars) {
+        const r = this;
 
-        const heading = Object.assign({}, R._heading, S._heading);
+        const heading = Object.assign({}, r._heading, s._heading);
 
         const rel = new Relation(heading);
 
-        if (!R.size || !S.size) { return rel; }
+        if (!r.size || !s.size) { return rel; }
 
-        const rule = (params) => {
+        const rule_fn = (params) => {
             const r_params = {}, s_params = {};
             let r_params_length = 0, s_params_length = 0;
 
             for (let param in params) {
-                if (R._heading[param]) {
+                if (r._heading[param]) {
                     r_params[param] = params[param];
                     r_params_length++;
                 }
 
-                if (S._heading[param]) {
+                if (s._heading[param]) {
                     s_params[param] = params[param];
                     s_params_length++;
                 }
             }
 
-            const new_r_body = R._select(r_params_length ? r_params : null);
-            if (new_r_body === INDEFINITE) { return new_r_body; }
-            if (!new_r_body.length) { return; }
+            let r_results;
 
-            const new_s_body = S._select(s_params_length ? s_params : null);
-            if (new_s_body === INDEFINITE) { return new_s_body; }
-            if (!new_s_body.length) { return; }
+            if (r_params.length) {
+                r_results = r._select(r_params);
+                if (r_results === INDEFINITE) { return r_results; }
+            } else { r_results = r._select(); }
 
-            return and({ _body: new_r_body }, { _body: new_s_body });
+            if (!r_results.length) { return; }
+
+            let s_results;
+
+            if (s_params.length) {
+                s_results = s._select(s_params);
+                if (s_results === INDEFINITE) { return s_results; }
+            } else { s_results = s._select(); }
+
+            if (!s_results.length) { return; }
+
+            return and(r_results, s_results);
         };
 
         if (common_vars.length) {
-            const fn = (R, S) => {
-                const body = join(R, S, common_vars);
+            const fn = (r, s) => {
+                const results = join(r._body, s, common_vars);
 
-                if (body === INDEFINITE) {
+                if (results === INDEFINITE) {
                     rel._rule((params) => {
                         const new_common_vars = new Set(common_vars);
 
@@ -352,53 +362,55 @@ class Relation {
                             }
                         }
 
-                        const new_r = { _body: times(R, { _body: [params] }) };
-                        return join(new_r, S, new_common_vars);
+                        return join(times(r, [params]), s, new_common_vars);
                     });
-                } else { rel._body = body; }
+                } else { rel._body = results; }
 
                 return rel;
             };
 
-            if (R._indefinite) {
-                if (!S._indefinite) { return fn(S, R); }
+            if (r._indefinite) {
+                if (!s._indefinite) { return fn(s, r); }
 
-                var and = (new_r, new_s) => {
-                    new_s._heading = S._heading;
-                    new_s._select = Relation.prototype._select.bind(new_s);
+                var and = (r_results, s_results) => {
+                    const new_s = {
+                        _heading: s._heading,
+                        _body: s_results,
+                        _select: Relation.prototype._select.bind(new_s)
+                    };
 
-                    return join(new_r, new_s, common_vars);
+                    return join(r_results, new_s, common_vars);
                 };
 
-                rel._rule(rule);
+                rel._rule(rule_fn);
 
                 return rel;
             }
 
-            return fn(R, S);
+            return fn(r, s);
         }
 
         var and = times;
 
-        const body = rule();
+        const results = rule_fn();
 
-        if (body !== INDEFINITE) {
-            if (body) { rel._body = body; }
-        } else { rel._rule(rule); }
+        if (results !== INDEFINITE) {
+            if (results) { rel._body = results; }
+        } else { rel._rule(rule_fn); }
 
         return rel;
     }
 
-    and(S) {
-        return this._and(S, this._getCommonFreeVariables(S));
+    and(s) {
+        return this._and(s, this._getCommonFreeVariables(s));
     }
 
-    or(S) {
-        const R = this;
+    or(s) {
+        const r = this;
 
-        const common_vars = R._getCommonFreeVariables(S);
+        const common_vars = r._getCommonFreeVariables(s);
         
-        const heading = Object.assign({}, R._heading, S._heading);
+        const heading = Object.assign({}, r._heading, s._heading);
 
         const rel = new Relation(heading);
 
@@ -415,20 +427,20 @@ class Relation {
         }
 
         if (rel._degree === common_vars.length) {
-            const rule = (params) => {
-                const r_body = R._select(params);
-                if (r_body === INDEFINITE) { return r_body; }
+            const rule_fn = (params) => {
+                const r_results = r._select(params);
+                if (r_results === INDEFINITE) { return r_results; }
 
-                const s_body = S._select(params);
-                if (s_body === INDEFINITE) { return s_body; }
+                const s_results = s._select(params);
+                if (s_results === INDEFINITE) { return s_results; }
 
-                return union({ _body: r_body }, { _body: s_body });
+                return union(r_results, s_results);
             };
 
-            const body = rule();
+            const results = rule_fn();
 
-            if (body !== INDEFINITE) { rel._body = body; } 
-            else { rel._rule(rule); }
+            if (results !== INDEFINITE) { rel._body = results; } 
+            else { rel._rule(rule_fn); }
 
             return rel;
         }
@@ -452,10 +464,10 @@ class Relation {
                 if (!params.hasOwnProperty(attr)) { return INDEFINITE; }
             }
 
-            let results = R._select(common_params);
+            let results = r._select(common_params);
 
             if (results === INDEFINITE || !results.length) {
-                results = S._select(common_params);
+                results = s._select(common_params);
 
                 if (results === INDEFINITE) { return results; }
                 if (!results.length) { return; }
@@ -540,10 +552,10 @@ class Relation {
                     }
                 }
 
-                const body = this._select(new_params);
-                if (body === INDEFINITE) { return body; }
+                const results = this._select(new_params);
+                if (results === INDEFINITE) { return results; }
 
-                return fn(body);
+                return fn(results);
             });
         }
 
@@ -581,27 +593,27 @@ class Relation {
 
         if (this._indefinite) {
             rel._rule((params) => {
-                const body = this._select(params);
+                const results = this._select(params);
 
-                if (body === INDEFINITE) {
+                if (results === INDEFINITE) {
                     if (Object.keys(params).length === rel._degree) {
                         return [params];
                     }
 
-                    return body;
+                    return results;
                 }
 
-                return fn(body);
+                return fn(results);
             });
         }
 
         return rel;
     }
 
-    compose(S) {
-        const R = this, common_vars = R._getCommonFreeVariables(S);
+    compose(s) {
+        const r = this, common_vars = r._getCommonFreeVariables(s);
 
-        const anded_rel = R._and(S, common_vars);
+        const anded_rel = r._and(s, common_vars);
 
         if (common_vars.length) { return anded_rel.remove(common_vars); }
 
@@ -632,7 +644,7 @@ class Relation {
                 }
             }
 
-            const new_body = union({ _body: body }, { _body: closures });
+            const new_body = union(body, closures);
 
             if (new_body.length === body.length) { return new_body; }
 
