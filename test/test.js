@@ -97,7 +97,7 @@ describe('Relation', () => {
             const person = new Relation(null, [{ name: 'Jack', age: 30 }]);
             expect(person.toBoolean()).to.be.true;
 
-            expect(plus.toBoolean()).to.be.true;
+            expect(person.toBoolean()).to.be.true;
         });
 
         it('should return false for relation when cardinality <= 0', () => {
