@@ -1,38 +1,43 @@
 {
-  "name": "relational.js",
-  "version": "1.0.11",
-  "description": "Implementation of the relational algebra",
-  "main": "relational.js",
-  "scripts": {
-    "test": "./node_modules/.bin/mocha --reporter spec"
-  },
-  "keywords": [
-    "relational",
-    "algebra",
-    "database",
-    "rdbms",
-    "trdbms",
-    "truly-rdbms",
-    "logic",
-    "datalog",
-    "prolog",
-    "logic programming",
-    "the third manifesto",
-    "ttm",
-    "tutorial d",
-    "d",
-    "a"
-  ],
-  "dependencies": {
-    "algebra.js": "^0.2.5",
-    "chai": "^3.5.0",
-    "clone": "^1.0.2",
-    "mocha": "^2.5.3"
-  },
-  "author": "Erik Olson <erikolson186@gmail.com>",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/erikolson186/relational.js.git"
-  }
+    "name": "relational.js",
+    "version": "1.0.12",
+    "description": "Implementation of the relational algebra",
+    "main": "./build/relational.js",
+    "scripts": {
+        "test": "./node_modules/.bin/mocha --reporter spec"
+    },
+    "keywords": [
+        "relational",
+        "algebra",
+        "database",
+        "rdbms",
+        "trdbms",
+        "truly-rdbms",
+        "logic",
+        "datalog",
+        "prolog",
+        "logic programming",
+        "the third manifesto",
+        "ttm",
+        "tutorial d",
+        "d",
+        "a"
+    ],
+    "dependencies": {
+        "algebra.js": "^0.2.5",
+        "clone": "^1.0.2"
+    },
+    "author": "Erik Olson <erikolson186@gmail.com>",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/erikolson186/relational.js.git"
+    },
+    "devDependencies": {
+        "babel-preset-es2015": "^6.14.0",
+        "chai": "^3.5.0",
+        "gulp": "^3.9.1",
+        "gulp-babel": "^6.1.2",
+        "mocha": "^3.0.2"
+    }
 }

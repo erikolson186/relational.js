@@ -1,4 +1,4 @@
-const expect = require('chai').expect;
+const { expect } = require('chai');
 const clone = require('clone');
 
 const {
@@ -14,7 +14,7 @@ const {
     lte,
     positive,
     negative
-} = require('../relational.js');
+} = require('../src/relational.js');
 
 const INDEFINITE = Symbol.for('indefinite');
 
@@ -22,7 +22,6 @@ describe('Relation', () => {
     describe('.insert', () => {
         it('should insert tuple into body', () => {
             const r = new Relation({ x: Number, k: Number });
-
             const tuple = { x: 4, k: 8 };
 
             r.add(tuple);
@@ -33,7 +32,6 @@ describe('Relation', () => {
 
         it('should work with tuples as values', () => {
             const r = new Relation({ obj: Object });
-
             const tuple = { obj: { x: 4 } };
 
             r.add(tuple);
@@ -50,10 +48,9 @@ describe('Relation', () => {
             }
 
             const r = new Relation({ x: Number, p: Person });
-            
             const p = new Person([{ name: 'Thomas', age: 59 }]);
-            const tuple = { x: 4, p };
 
+            const tuple = { x: 4, p };
             r.add(tuple);
 
             expect(r.size).to.equal(1);
@@ -64,7 +61,6 @@ describe('Relation', () => {
     describe('.delete', () => {
         it('should delete tuple from definite body', () => {
             const tuple1 = { d: 3.0 }, tuple2 = { d: 4.8 };
-
             const r = new Relation(null, [tuple1, tuple2]);
 
             r.delete(tuple2);
@@ -73,7 +69,6 @@ describe('Relation', () => {
             expect([...r]).to.deep.equal([tuple1]);
 
             const tuple3 = { obj: { x: 3 } };
-
             const s = new Relation(null, [tuple3]);
 
             s.delete(tuple3);
@@ -84,7 +79,6 @@ describe('Relation', () => {
 
         it('should delete tuple from indefinite body', () => {
             const new_plus = clone(plus);
-
             const tuple = { x: 4, y: 2, z: 6 };
 
             new_plus.delete(tuple);
@@ -105,17 +99,14 @@ describe('Relation', () => {
 
     describe('.and', () => {
         it('should perform the natural join when common vars', () => {
-            const tuple1 = { name: 'Thomas', age: 30 };
-            const tuple2 = { name: 'Jack', age: 44 };
+            const tuple1 = { name: 'Thomas', age: 30 },
+                  tuple2 = { name: 'Jack', age: 44 },
+                  person = new Relation(null, [tuple1, tuple2]);
 
-            const person = new Relation(null, [tuple1, tuple2]);
-
-            const tuple3 = { name: 'Thomas', position: 'programmer' };
-            const tuple4 = { name: 'Jack', position: 'manager' };
-
-            const employee = new Relation(null, [tuple3, tuple4]);
-
-            const someone = person.and(employee);
+            const tuple3 = { name: 'Thomas', position: 'programmer' },
+                  tuple4 = { name: 'Jack', position: 'manager' },
+                  employee = new Relation(null, [tuple3, tuple4]),
+                  someone = person.and(employee);
 
             const tuple5 = Object.assign({}, tuple1, tuple3);
             expect(someone.has(tuple5)).to.be.true;
@@ -125,10 +116,9 @@ describe('Relation', () => {
         });
 
         it('should perform the times when headers are disjoint', () => {
-            const r = new Relation(null, [{ x: 4 }, { x: 6 }]);
-            const s = new Relation(null, [{ g: 3 }, { g: 8 }]);
-            
-            const g = r.and(s);
+            const r = new Relation(null, [{ x: 4 }, { x: 6 }]),
+                  s = new Relation(null, [{ g: 3 }, { g: 8 }]),
+                  g = r.and(s);
 
             expect(g.has({ x: 4, g: 3 })).to.be.true;
             expect(g.has({ x: 4, g: 8 })).to.be.true;
@@ -152,10 +142,9 @@ describe('Relation', () => {
         });
 
         it('should return relation with any value for uncommon vars', () => {
-            const r = new Relation(null, [{ x: 4, g: 3 }]);
-            const s = new Relation(null, [{ x: 4, k: 8 }]);
-
-            const g = r.or(s);
+            const r = new Relation(null, [{ x: 4, g: 3 }]),
+                  s = new Relation(null, [{ x: 4, k: 8 }]),
+                  g = r.or(s);
 
             expect(g.size).to.equal(INDEFINITE);
             expect(g.degree).to.equal(3);
@@ -167,7 +156,7 @@ describe('Relation', () => {
         });
     });
 
-    describe('.not', () => { 
+    describe('.not', () => {
         it('should perform the negation', () => {
             const person = new Relation(null, [
                 { name: 'Jack' },
@@ -196,7 +185,6 @@ describe('Relation', () => {
     describe('.rename', () => {
         it('should perform the rename', () => {
             const r = new Relation(null, [{ g: 4, k: 8 }, { g: 6, k: 2 }]);
-
             const s = r.rename({ g: 'b' });
 
             expect(s.has({ b: 4, k: 8 })).to.be.true;
@@ -206,10 +194,9 @@ describe('Relation', () => {
 
     describe('.remove', () => {
         it('should perform the remove', () => {
-            const r = new Relation(null, [{ d: 3, t: 2 }, { d: 8, t: 3 }]);
-            const s = new Relation(null, [{ d: 3, t: 8 }, { d: 8, t: 6 }]);
-
-            const p = r.remove(['t']);
+            const r = new Relation(null, [{ d: 3, t: 2 }, { d: 8, t: 3 }]),
+                  s = new Relation(null, [{ d: 3, t: 8 }, { d: 8, t: 6 }]),
+                  p = r.remove(['t']);
 
             expect(p.degree).to.equal(1);
             expect(p.heading.d).to.be.ok;
@@ -225,10 +212,9 @@ describe('Relation', () => {
 
     describe('.compose', () => {
         it('should perform the compose', () => {
-            const f = new Relation(null, [{ x: 2, y: 8 }]);
-            const r = new Relation(null, [{ x: 2 }]);
-
-            const s = f.compose(r);
+            const f = new Relation(null, [{ x: 2, y: 8 }]),
+                  r = new Relation(null, [{ x: 2 }]),
+                  s = f.compose(r);
 
             expect(s.degree).to.equal(1);
             expect(s.has({ y: 8 })).to.be.true;
@@ -320,7 +306,7 @@ describe('divide', () => {
 describe('gt', () => {
     it('should compare for greater than', () => {
         const r = gt.and(new Relation(null, [{ x: 4, y: 0 }]));
-        
+
         expect(r.toBoolean()).to.be.true;
     });
 });
@@ -328,7 +314,7 @@ describe('gt', () => {
 describe('gte', () => {
     it('should compare for greater than or equal to', () => {
         const r = gte.and(new Relation(null, [{ x: 3, y: 3 }]));
-        
+
         expect(r.toBoolean()).to.be.true;
     });
 });
@@ -336,7 +322,7 @@ describe('gte', () => {
 describe('lt', () => {
     it('should compare for less than', () => {
         const r = lt.and(new Relation(null, [{ x: 4, y: 3 }]));
-        
+
         expect(r.toBoolean()).to.be.false;
     });
 });
@@ -344,7 +330,7 @@ describe('lt', () => {
 describe('lte', () => {
     it('should compare for less than or equal to', () => {
         const r = lte.and(new Relation(null, [{ x: 6, y: 8 }]));
-        
+
         expect(r.toBoolean()).to.be.true;
     });
 });

@@ -25,15 +25,15 @@ let { Relation } = Relational;
 
 ### Defining Relations
 
-Relations are defined using the `Relation(heading, body[, rule_fn])` constructor where **heading** is an object with enumerable properties being attribute names with the values being type constructors, and **body** is an iterable of tuples as objects that conform to the heading to be inserted. If **heading** is missing, but **body** isn't, then the heading is inferred using the first element of **body**, otherwise the relation will have a degree of zero. 
+Relations are defined using the `Relation(heading, body[, ruleFn])` constructor where **heading** is an object with enumerable properties being attribute names with the values being type constructors, and **body** is an iterable of tuples as objects that conform to the heading to be inserted. If **heading** is missing, but **body** isn't, then the heading is inferred using the first element of **body**, otherwise the relation will have a degree of zero. 
 
-The **rule_fn** argument is optional and acts as a rule defined for the relation. Rules are used for defining theorems as a series of goals that when queried an attempt is made to resolve tuples by proving the theorem true by finding values of attributes that satisfy the rules. If a value for **rule_fn** is supplied it must be a function that accepts a single argument being an object with bound variable identifiers as enumerable properties that includes the corresponding values. The function acts as a Horn clause similar to the rules of Datalog and Prolog. If the solution to the rule for any given supplied bound variables is an indefinite number of tuples then **rule_fn** should return `Symbol(indefinite)`. If there is no solution it should return `undefined`, `null` or `false`. Otherwise it should return the solution as an iterable of tuples as objects. It is optional for the returned tuples as objects to include enumerable properties of the bound variables. If the tuples of the solution only contain the bound variables, then **rule_fn** can optionally return `true`. When a rule is provided, the `Relation` object has a `size` attribute of value `Symbol(indefinite)`.
+The **ruleFn** argument is optional and acts as a rule defined for the relation. Rules are used for defining theorems as a series of goals that when queried an attempt is made to resolve tuples by proving the theorem true by finding values of attributes that satisfy the rules. If a value for **ruleFn** is supplied it must be a function that accepts a single argument being an object with bound variable identifiers as enumerable properties that includes the corresponding values. The function acts as a Horn clause similar to the rules of Datalog and Prolog. If the solution to the rule for any given supplied bound variables is an indefinite number of tuples then **ruleFn** should return `Symbol(indefinite)`. If there is no solution it should return `undefined`, `null` or `false`. Otherwise it should return the solution as an iterable of tuples as objects. It is optional for the returned tuples as objects to include enumerable properties of the bound variables. If the tuples of the solution only contain the bound variables, then **ruleFn** can optionally return `true`. When a rule is provided, the `Relation` object has a `size` attribute of value `Symbol(indefinite)`.
 
 ```javascript
-let r = new Relation();
-let s = new Relation({ x: Number });
-let p = new Relation({ d: Number }, [{ d: 4 }]);
-let g = new Relation(null, [{ k: 8 }]);
+let r = new Relation(),
+    s = new Relation({ x: Number }),
+    p = new Relation({ d: Number }, [{ d: 4 }]),
+    g = new Relation(null, [{ k: 8 }]);
 ```
 
 An example of using rules to define a relation with a heading that includes the single attribute **x** of type `Number`, and a body of an infinite number of tuples (which are not computed) where the value of **x** is a positive number.
@@ -177,7 +177,6 @@ An instance of the `Set` constructor includes the `has` method. An instance of `
 
 ```javascript
 let person = new Relation(null, [{ name: 'Jack' }, { name: 'Tom' }]);
-
 let b = person.has({ name: 'Tom' });
 
 console.log(`It is ${b} that there is a person named Tom.`);
