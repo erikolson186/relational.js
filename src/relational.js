@@ -292,7 +292,7 @@ class Relation {
         return rel;
     }
 
-    _andAnyIndefinite(r, s, rel, and) {
+    _andBothIndefinite(r, s, rel, and) {
         const ruleFn = (params) => {
             const r_params = {}, s_params = {};
 
@@ -338,7 +338,7 @@ class Relation {
                 return rel;
             }
 
-            return this._andAnyIndefinite(r, s, rel, times);
+            return this._andBothIndefinite(r, s, rel, times);
         }
 
         if (r._indefinite) {
@@ -364,7 +364,7 @@ class Relation {
             return join(r_results, new_s, common_vars);
         };
 
-        return this._andAnyIndefinite(r, s, rel, and);
+        return this._andBothIndefinite(r, s, rel, and);
     }
 
     and(s) {

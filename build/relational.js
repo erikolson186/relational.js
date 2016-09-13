@@ -439,14 +439,7 @@ var Relation = function () {
     }, {
         key: '_select1',
         value: function _select1(params) {
-            var fields = [];
-
-            for (var field in params) {
-                if (this._heading[field]) {
-                    fields.push(field);
-                }
-            }
-
+            var fields = Object.keys(params);
             if (!fields.length) {
                 return clone(this._body);
             }
@@ -460,9 +453,9 @@ var Relation = function () {
 
                 try {
                     for (var _iterator10 = fields[Symbol.iterator](), _step10; !(_iteratorNormalCompletion10 = (_step10 = _iterator10.next()).done); _iteratorNormalCompletion10 = true) {
-                        var _field2 = _step10.value;
+                        var field = _step10.value;
 
-                        if (!deepEqual(tuple[_field2], params[_field2])) {
+                        if (!deepEqual(tuple[field], params[field])) {
                             return;
                         }
                     }
@@ -489,20 +482,12 @@ var Relation = function () {
     }, {
         key: '_select2',
         value: function _select2(params) {
-            var new_params = {};
-
-            for (var param in params) {
-                if (this._heading[param]) {
-                    new_params[param] = params[param];
-                }
-            }
-
-            var select_results = this._select1(new_params);
+            var select_results = this._select1(params);
             if (select_results === INDEFINITE) {
                 return select_results;
             }
 
-            var fn_results = this._ruleFn(new_params);
+            var fn_results = this._ruleFn(params);
             if (fn_results === INDEFINITE) {
                 return fn_results;
             }
@@ -520,8 +505,8 @@ var Relation = function () {
                 for (var _iterator11 = fn_results[Symbol.iterator](), _step11; !(_iteratorNormalCompletion11 = (_step11 = _iterator11.next()).done); _iteratorNormalCompletion11 = true) {
                     var tuple = _step11.value;
 
-                    for (var _param in new_params) {
-                        tuple[_param] = new_params[_param];
+                    for (var param in params) {
+                        tuple[param] = params[param];
                     }
                 }
             } catch (err) {
@@ -578,17 +563,32 @@ var Relation = function () {
             }
         }
     }, {
-        key: '_and',
-        value: function _and(s, common_vars) {
-            var r = this,
-                heading = Object.assign({}, r._heading, s._heading),
-                rel = new Relation(heading);
+        key: '_andOneIndefinite',
+        value: function _andOneIndefinite(r, s, common_vars, rel) {
+            var results = join(r, s, common_vars);
 
-            if (!r.size || !s.size) {
-                return rel;
+            if (results === INDEFINITE) {
+                rel.rule(function (params) {
+                    var new_common_vars = new Set(common_vars);
+
+                    for (var field in rel.heading) {
+                        if (params.hasOwnProperty(field)) {
+                            new_common_vars.add(field);
+                        }
+                    }
+
+                    return join(times(r, [params]), s, new_common_vars);
+                });
+            } else {
+                rel._body = results;
             }
 
-            var ruleFn = function ruleFn(and, params) {
+            return rel;
+        }
+    }, {
+        key: '_andBothIndefinite',
+        value: function _andBothIndefinite(r, s, rel, and) {
+            var ruleFn = function ruleFn(params) {
                 var r_params = {},
                     s_params = {};
 
@@ -621,48 +621,43 @@ var Relation = function () {
                 return and(r_results, s_results);
             };
 
+            rel.rule(ruleFn);
+
+            return rel;
+        }
+    }, {
+        key: '_and',
+        value: function _and(s, common_vars) {
+            var r = this,
+                heading = Object.assign({}, r._heading, s._heading),
+                rel = new Relation(heading);
+
+            if (!r.size || !s.size) {
+                return rel;
+            }
+
             if (!common_vars.length) {
-                var _ruleFn = function _ruleFn(params) {
-                    return ruleFn(times, params);
-                };
-                var results = _ruleFn({});
+                if (!r._indefinite && !s._indefinite) {
+                    var results = times(r, s);
 
-                if (results === INDEFINITE) {
-                    rel.rule(_ruleFn);
-                } else if (results) {
                     rel._body = results;
+
+                    return rel;
                 }
 
-                return rel;
+                return this._andBothIndefinite(r, s, rel, times);
             }
 
-            var fn = function fn(r, s) {
-                var results = join(r, s, common_vars);
-
-                if (results === INDEFINITE) {
-                    rel.rule(function (params) {
-                        var new_common_vars = new Set(common_vars);
-
-                        for (var field in heading) {
-                            if (params.hasOwnProperty(field)) {
-                                new_common_vars.add(field);
-                            }
-                        }
-
-                        return join(times(r, [params]), s, new_common_vars);
-                    });
-                } else {
-                    rel._body = results;
+            if (r._indefinite) {
+                if (!s._indefinite) {
+                    return this._andOneIndefinite(s, r, common_vars, rel);
                 }
+            } else if (s._indefinite) {
+                return this._andOneIndefinite(r, s, common_vars, rel);
+            } else {
+                rel._body = join(r, s, common_vars);
 
                 return rel;
-            };
-
-            if (!r._indefinite) {
-                return fn(r, s);
-            }
-            if (!s._indefinite) {
-                return fn(s, r);
             }
 
             var and = function and(r_results, s_results) {
@@ -676,11 +671,7 @@ var Relation = function () {
                 return join(r_results, new_s, common_vars);
             };
 
-            rel.rule(function (params) {
-                return ruleFn(and, params);
-            });
-
-            return rel;
+            return this._andBothIndefinite(r, s, rel, and);
         }
     }, {
         key: 'and',
@@ -708,7 +699,7 @@ var Relation = function () {
             }
 
             if (rel._degree === common_vars.length) {
-                var _ruleFn2 = function _ruleFn2(params) {
+                var _ruleFn = function _ruleFn(params) {
                     var r_results = r._select(params);
                     if (r_results === INDEFINITE) {
                         return r_results;
@@ -722,12 +713,12 @@ var Relation = function () {
                     return union(r_results, s_results);
                 };
 
-                var results = _ruleFn2({});
+                var results = _ruleFn({});
 
                 if (results !== INDEFINITE) {
                     rel._body = results;
                 } else {
-                    rel.rule(_ruleFn2);
+                    rel.rule(_ruleFn);
                 }
 
                 return rel;
@@ -750,10 +741,10 @@ var Relation = function () {
 
                 try {
                     for (var _iterator12 = common_vars[Symbol.iterator](), _step12; !(_iteratorNormalCompletion12 = (_step12 = _iterator12.next()).done); _iteratorNormalCompletion12 = true) {
-                        var _field3 = _step12.value;
+                        var _field2 = _step12.value;
 
-                        if (params.hasOwnProperty(_field3)) {
-                            common_params[_field3] = params[_field3];
+                        if (params.hasOwnProperty(_field2)) {
+                            common_params[_field2] = params[_field2];
                         }
                     }
                 } catch (err) {
@@ -777,9 +768,9 @@ var Relation = function () {
 
                 try {
                     for (var _iterator13 = uncommon_vars[Symbol.iterator](), _step13; !(_iteratorNormalCompletion13 = (_step13 = _iterator13.next()).done); _iteratorNormalCompletion13 = true) {
-                        var _field4 = _step13.value;
+                        var _field3 = _step13.value;
 
-                        if (!params.hasOwnProperty(_field4)) {
+                        if (!params.hasOwnProperty(_field3)) {
                             return INDEFINITE;
                         }
                     }
@@ -888,9 +879,9 @@ var Relation = function () {
 
                         var new_tuple = clone(tuple);
 
-                        for (var _field5 in spec) {
-                            var _a = _field5,
-                                _b = spec[_field5];
+                        for (var _field4 in spec) {
+                            var _a = _field4,
+                                _b = spec[_field4];
 
                             new_tuple[_b] = tuple[_a];
                             delete new_tuple[_a];
@@ -925,9 +916,9 @@ var Relation = function () {
             rel.rule(function (params) {
                 var new_params = clone(params);
 
-                for (var _field6 in spec) {
-                    var _a2 = _field6,
-                        _b2 = spec[_field6];
+                for (var _field5 in spec) {
+                    var _a2 = _field5,
+                        _b2 = spec[_field5];
 
                     if (params.hasOwnProperty(_b2)) {
                         new_params[_a2] = params[_b2];
