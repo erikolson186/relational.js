@@ -203,12 +203,7 @@ class Relation {
     }
 
     _select1(params) {
-        const fields = [];
-
-        for (let field in params) {
-            if (this._heading[field]) { fields.push(field); }
-        }
-
+        const fields = Object.keys(params);
         if (!fields.length) { return clone(this._body); }
 
         const results = [];
@@ -227,26 +222,18 @@ class Relation {
     }
 
     _select2(params) {
-        const new_params = {};
-
-        for (let param in params) {
-            if (this._heading[param]) {
-                new_params[param] = params[param];
-            }
-        }
-
-        const select_results = this._select1(new_params);
+        const select_results = this._select1(params);
         if (select_results === INDEFINITE) { return select_results; }
 
-        let fn_results = this._ruleFn(new_params);
+        let fn_results = this._ruleFn(params);
         if (fn_results === INDEFINITE) { return fn_results; }
         if (!fn_results) { return select_results; }
 
         fn_results = fn_results === true ? [{}] : [...fn_results];
 
         for (let tuple of fn_results) {
-            for (let param in new_params) {
-                tuple[param] = new_params[param];
+            for (let param in params) {
+                tuple[param] = params[param];
             }
         }
 
@@ -285,14 +272,28 @@ class Relation {
         }
     }
 
-    _and(s, common_vars) {
-        const r = this,
-              heading = Object.assign({}, r._heading, s._heading),
-              rel = new Relation(heading);
+    _andOneIndefinite(r, s, common_vars, rel) {
+        const results = join(r, s, common_vars);
 
-        if (!r.size || !s.size) { return rel; }
+        if (results === INDEFINITE) {
+            rel.rule((params) => {
+                const new_common_vars = new Set(common_vars);
 
-        const ruleFn = (and, params) => {
+                for (let field in rel.heading) {
+                    if (params.hasOwnProperty(field)) {
+                        new_common_vars.add(field);
+                    }
+                }
+
+                return join(times(r, [params]), s, new_common_vars);
+            });
+        } else { rel._body = results; }
+
+        return rel;
+    }
+
+    _andAnyIndefinite(r, s, rel, and) {
+        const ruleFn = (params) => {
             const r_params = {}, s_params = {};
 
             for (let param in params) {
@@ -316,38 +317,41 @@ class Relation {
             return and(r_results, s_results);
         };
 
-        if (!common_vars.length) {
-            const _ruleFn = params => ruleFn(times, params);
-            const results = _ruleFn({});
+        rel.rule(ruleFn);
 
-            if (results === INDEFINITE) { rel.rule(_ruleFn); }
-            else if (results) { rel._body = results; }
+        return rel;
+    }
+
+    _and(s, common_vars) {
+        const r = this,
+              heading = Object.assign({}, r._heading, s._heading),
+              rel = new Relation(heading);
+
+        if (!r.size || !s.size) { return rel; }
+
+        if (!common_vars.length) {
+            if (!r._indefinite && !s._indefinite) {
+                const results = times(r, s);
+
+                rel._body = results;
+
+                return rel;
+            }
+
+            return this._andAnyIndefinite(r, s, rel, times);
+        }
+
+        if (r._indefinite) {
+            if (!s._indefinite) {
+                return this._andOneIndefinite(s, r, common_vars, rel);
+            }
+        } else if (s._indefinite) {
+            return this._andOneIndefinite(r, s, common_vars, rel);
+        } else {
+            rel._body = join(r, s, common_vars);
 
             return rel;
         }
-
-        const fn = (r, s) => {
-            const results = join(r, s, common_vars);
-
-            if (results === INDEFINITE) {
-                rel.rule((params) => {
-                    const new_common_vars = new Set(common_vars);
-
-                    for (let field in heading) {
-                        if (params.hasOwnProperty(field)) {
-                            new_common_vars.add(field);
-                        }
-                    }
-
-                    return join(times(r, [params]), s, new_common_vars);
-                });
-            } else { rel._body = results; }
-
-            return rel;
-        };
-
-        if (!r._indefinite) { return fn(r, s); }
-        if (!s._indefinite) { return fn(s, r); }
 
         const and = (r_results, s_results) => {
             const new_s = {
@@ -360,9 +364,7 @@ class Relation {
             return join(r_results, new_s, common_vars);
         };
 
-        rel.rule(params => ruleFn(and, params));
-
-        return rel;
+        return this._andAnyIndefinite(r, s, rel, and);
     }
 
     and(s) {
